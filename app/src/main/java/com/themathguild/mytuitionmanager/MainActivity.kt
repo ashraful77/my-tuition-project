@@ -244,6 +244,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TuitionApp(store: LocalStore) {
     val context = androidx.compose.ui.platform.LocalContext.current
