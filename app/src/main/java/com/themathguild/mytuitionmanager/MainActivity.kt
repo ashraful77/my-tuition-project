@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,15 +51,25 @@ data class Payment(
 class LocalStore(context: Context) {
 
     private val prefs =
-        context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
-
-    fun loadStudents(): List<Student> {
-        val a = JSONArray(
-            prefs.getString("students", "[]")
+        context.getSharedPreferences(
+            "tuition_data",
+            Context.MODE_PRIVATE
         )
 
+    fun loadStudents(): List<Student> {
+
+        val a =
+            JSONArray(
+                prefs.getString(
+                    "students",
+                    "[]"
+                )
+            )
+
         return List(a.length()) { i ->
-            val o = a.getJSONObject(i)
+
+            val o =
+                a.getJSONObject(i)
 
             Student(
                 o.getLong("id"),
@@ -72,13 +82,18 @@ class LocalStore(context: Context) {
         }
     }
 
-    fun saveStudents(list: List<Student>) {
+    fun saveStudents(
+        list: List<Student>
+    ) {
 
-        val a = JSONArray()
+        val a =
+            JSONArray()
 
         list.forEach {
+
             a.put(
                 JSONObject().apply {
+
                     put("id", it.id)
                     put("name", it.name)
                     put("className", it.className)
@@ -90,18 +105,27 @@ class LocalStore(context: Context) {
         }
 
         prefs.edit()
-            .putString("students", a.toString())
+            .putString(
+                "students",
+                a.toString()
+            )
             .apply()
     }
 
     fun loadPayments(): List<Payment> {
 
-        val a = JSONArray(
-            prefs.getString("payments", "[]")
-        )
+        val a =
+            JSONArray(
+                prefs.getString(
+                    "payments",
+                    "[]"
+                )
+            )
 
         return List(a.length()) { i ->
-            val o = a.getJSONObject(i)
+
+            val o =
+                a.getJSONObject(i)
 
             Payment(
                 o.getLong("studentId"),
@@ -112,42 +136,68 @@ class LocalStore(context: Context) {
         }
     }
 
-    fun savePayments(list: List<Payment>) {
+    fun savePayments(
+        list: List<Payment>
+    ) {
 
-        val a = JSONArray()
+        val a =
+            JSONArray()
 
         list.forEach {
+
             a.put(
                 JSONObject().apply {
-                    put("studentId", it.studentId)
-                    put("month", it.month)
-                    put("amount", it.amount)
-                    put("date", it.date)
+
+                    put(
+                        "studentId",
+                        it.studentId
+                    )
+
+                    put(
+                        "month",
+                        it.month
+                    )
+
+                    put(
+                        "amount",
+                        it.amount
+                    )
+
+                    put(
+                        "date",
+                        it.date
+                    )
                 }
             )
         }
 
         prefs.edit()
-            .putString("payments", a.toString())
+            .putString(
+                "payments",
+                a.toString()
+            )
             .apply()
     }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    DATE HELPERS
---------------------------------------------------------- */
+========================================================= */
 
 fun currentMonth(): String {
 
     return SimpleDateFormat(
         "MMMM yyyy",
-        Locale.getDefault()
+        Locale.ENGLISH
     ).format(Date())
 }
 
-fun monthKey(month: String): YearMonth? {
+fun monthKey(
+    month: String
+): YearMonth? {
 
     return try {
+
         YearMonth.parse(
             month,
             DateTimeFormatter.ofPattern(
@@ -155,18 +205,23 @@ fun monthKey(month: String): YearMonth? {
                 Locale.ENGLISH
             )
         )
+
     } catch (_: Exception) {
+
         null
     }
 }
 
-fun money(value: Int): String {
+fun money(
+    value: Int
+): String {
+
     return "₹$value"
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    RECEIPT PDF
---------------------------------------------------------- */
+========================================================= */
 
 fun createReceiptPdf(
     context: Context,
@@ -175,19 +230,27 @@ fun createReceiptPdf(
     receiptNo: String
 ): Uri {
 
-    val doc = PdfDocument()
+    val doc =
+        PdfDocument()
 
-    val page = doc.startPage(
-        PdfDocument.PageInfo
-            .Builder(595, 842, 1)
-            .create()
-    )
+    val page =
+        doc.startPage(
+            PdfDocument.PageInfo
+                .Builder(
+                    595,
+                    842,
+                    1
+                )
+                .create()
+        )
 
-    val canvas = page.canvas
+    val canvas =
+        page.canvas
 
-    val paint = Paint().apply {
-        isAntiAlias = true
-    }
+    val paint =
+        Paint().apply {
+            isAntiAlias = true
+        }
 
     var y = 55f
 
@@ -197,8 +260,11 @@ fun createReceiptPdf(
         bold: Boolean = false
     ) {
 
-        paint.textSize = size
-        paint.isFakeBoldText = bold
+        paint.textSize =
+            size
+
+        paint.isFakeBoldText =
+            bold
 
         canvas.drawText(
             value,
@@ -207,10 +273,11 @@ fun createReceiptPdf(
             paint
         )
 
-        y += size + 12f
+        y +=
+            size + 12f
     }
 
-    fun line() {
+    fun separator() {
 
         canvas.drawLine(
             55f,
@@ -244,7 +311,7 @@ fun createReceiptPdf(
 
     y += 10f
 
-    line()
+    separator()
 
     text(
         "Receipt No.: $receiptNo",
@@ -258,7 +325,7 @@ fun createReceiptPdf(
 
     y += 8f
 
-    line()
+    separator()
 
     text(
         "STUDENT DETAILS",
@@ -280,7 +347,10 @@ fun createReceiptPdf(
         "Batch: ${student.batch}"
     )
 
-    if (student.phone.isNotBlank()) {
+    if (
+        student.phone.isNotBlank()
+    ) {
+
         text(
             "Phone: ${student.phone}"
         )
@@ -288,7 +358,7 @@ fun createReceiptPdf(
 
     y += 8f
 
-    line()
+    separator()
 
     text(
         "PAYMENT DETAILS",
@@ -318,7 +388,7 @@ fun createReceiptPdf(
 
     y += 20f
 
-    line()
+    separator()
 
     text(
         "Thank you for your payment.",
@@ -372,9 +442,9 @@ fun createReceiptPdf(
     )
 }
 
-/* ---------------------------------------------------------
-   SHARE RECEIPT
---------------------------------------------------------- */
+/* =========================================================
+   SHARE
+========================================================= */
 
 fun shareReceipt(
     context: Context,
@@ -382,9 +452,12 @@ fun shareReceipt(
 ) {
 
     val intent =
-        Intent(Intent.ACTION_SEND).apply {
+        Intent(
+            Intent.ACTION_SEND
+        ).apply {
 
-            type = "application/pdf"
+            type =
+                "application/pdf"
 
             putExtra(
                 Intent.EXTRA_STREAM,
@@ -409,24 +482,29 @@ fun shareReceiptWhatsApp(
     uri: Uri
 ) {
 
-    val intent =
-        Intent(Intent.ACTION_SEND).apply {
-
-            type = "application/pdf"
-
-            putExtra(
-                Intent.EXTRA_STREAM,
-                uri
-            )
-
-            setPackage("com.whatsapp")
-
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
-
     try {
+
+        val intent =
+            Intent(
+                Intent.ACTION_SEND
+            ).apply {
+
+                type =
+                    "application/pdf"
+
+                putExtra(
+                    Intent.EXTRA_STREAM,
+                    uri
+                )
+
+                setPackage(
+                    "com.whatsapp"
+                )
+
+                addFlags(
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
 
         context.startActivity(intent)
 
@@ -434,15 +512,15 @@ fun shareReceiptWhatsApp(
 
         Toast.makeText(
             context,
-            "WhatsApp is not available. Choose another sharing option.",
+            "WhatsApp is not available.",
             Toast.LENGTH_LONG
         ).show()
     }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    BACKUP
---------------------------------------------------------- */
+========================================================= */
 
 fun exportBackup(
     context: Context
@@ -569,14 +647,16 @@ fun importBackup(
     }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    MAIN ACTIVITY
---------------------------------------------------------- */
+========================================================= */
 
-class MainActivity : ComponentActivity() {
+class MainActivity :
+    ComponentActivity() {
 
     private var restoreCallback:
-            ((Boolean) -> Unit)? = null
+            ((Boolean) -> Unit)? =
+        null
 
     private val restoreLauncher =
         registerForActivityResult(
@@ -585,13 +665,17 @@ class MainActivity : ComponentActivity() {
 
             val ok =
                 uri?.let {
+
                     importBackup(
                         this,
                         it
                     )
+
                 } ?: false
 
-            restoreCallback?.invoke(ok)
+            restoreCallback?.invoke(
+                ok
+            )
 
             restoreCallback = null
         }
@@ -600,7 +684,8 @@ class MainActivity : ComponentActivity() {
         callback: (Boolean) -> Unit
     ) {
 
-        restoreCallback = callback
+        restoreCallback =
+            callback
 
         restoreLauncher.launch(
             arrayOf(
@@ -627,9 +712,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ---------------------------------------------------------
+/* =========================================================
    MAIN APP
---------------------------------------------------------- */
+========================================================= */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -681,10 +766,6 @@ fun TuitionApp(
         mutableStateOf(false)
     }
 
-    var backupOpen by remember {
-        mutableStateOf(false)
-    }
-
     var receiptUri by remember {
         mutableStateOf<Uri?>(null)
     }
@@ -695,15 +776,14 @@ fun TuitionApp(
     val currentPaid =
         payments
             .filter {
-                it.month == thisMonth
+                it.month.equals(
+                    thisMonth,
+                    true
+                )
             }
             .sumOf {
                 it.amount
             }
-
-    /* -----------------------------------------------------
-       TOTAL OUTSTANDING INCLUDING PREVIOUS MONTHS
-    ----------------------------------------------------- */
 
     fun studentOutstanding(
         student: Student
@@ -711,35 +791,33 @@ fun TuitionApp(
 
         val studentPayments =
             payments.filter {
-                it.studentId == student.id
+                it.studentId ==
+                    student.id
             }
+
+        val firstPaymentMonth =
+            studentPayments
+                .mapNotNull {
+                    monthKey(it.month)
+                }
+                .minOrNull()
 
         val firstMonth =
-            try {
-
-                YearMonth.from(
-                    java.time.Instant
-                        .ofEpochMilli(student.id)
-                        .atZone(
-                            java.time.ZoneId
-                                .systemDefault()
-                        )
-                )
-
-            } catch (_: Exception) {
-
-                YearMonth.now()
-            }
-
-        val now =
-            YearMonth.now()
+            firstPaymentMonth
+                ?: YearMonth.now()
 
         var month =
             firstMonth
 
-        var totalDue = 0
+        val now =
+            YearMonth.now()
 
-        while (!month.isAfter(now)) {
+        var totalDue =
+            0
+
+        while (
+            !month.isAfter(now)
+        ) {
 
             val monthName =
                 month.format(
@@ -754,7 +832,7 @@ fun TuitionApp(
                     .filter {
                         it.month.equals(
                             monthName,
-                            ignoreCase = true
+                            true
                         )
                     }
                     .sumOf {
@@ -785,24 +863,34 @@ fun TuitionApp(
             val paid =
                 payments
                     .filter {
-                        it.studentId == student.id &&
-                        it.month == thisMonth
+                        it.studentId ==
+                                student.id &&
+                        it.month.equals(
+                            thisMonth,
+                            true
+                        )
                     }
                     .sumOf {
                         it.amount
                     }
 
-            paid >= student.monthlyFee
+            paid >=
+                student.monthlyFee
         }
 
     val unpaidStudents =
-        students.size - paidStudents
+        students.size -
+                paidStudents
 
     val batches =
         listOf("All") +
                 students
-                    .map { it.batch }
-                    .filter { it.isNotBlank() }
+                    .map {
+                        it.batch
+                    }
+                    .filter {
+                        it.isNotBlank()
+                    }
                     .distinct()
                     .sorted()
 
@@ -812,28 +900,30 @@ fun TuitionApp(
 
                 it.name.contains(
                     search,
-                    ignoreCase = true
+                    true
                 ) ||
 
                 it.className.contains(
                     search,
-                    ignoreCase = true
+                    true
                 ) ||
 
                 it.batch.contains(
                     search,
-                    ignoreCase = true
+                    true
                 ) ||
 
                 it.phone.contains(
                     search,
-                    ignoreCase = true
+                    true
                 )
             }
             .filter {
 
-                selectedBatch == "All" ||
-                        it.batch == selectedBatch
+                selectedBatch ==
+                        "All" ||
+                        it.batch ==
+                        selectedBatch
             }
             .sortedBy {
                 it.name.lowercase()
@@ -901,12 +991,14 @@ fun TuitionApp(
                         .padding(16.dp),
 
                 verticalArrangement =
-                    Arrangement.spacedBy(12.dp)
+                    Arrangement.spacedBy(
+                        12.dp
+                    )
             ) {
 
-                /* -----------------------------------------
+                /* =================================================
                    DASHBOARD
-                ----------------------------------------- */
+                ================================================= */
 
                 item {
 
@@ -924,7 +1016,9 @@ fun TuitionApp(
 
                     Row(
                         horizontalArrangement =
-                            Arrangement.spacedBy(8.dp)
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
                     ) {
 
                         SummaryCard(
@@ -952,7 +1046,9 @@ fun TuitionApp(
 
                     Row(
                         horizontalArrangement =
-                            Arrangement.spacedBy(8.dp)
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
                     ) {
 
                         SummaryCard(
@@ -969,9 +1065,9 @@ fun TuitionApp(
                     }
                 }
 
-                /* -----------------------------------------
+                /* =================================================
                    SEARCH
-                ----------------------------------------- */
+                ================================================= */
 
                 item {
 
@@ -996,9 +1092,9 @@ fun TuitionApp(
                     )
                 }
 
-                /* -----------------------------------------
+                /* =================================================
                    BATCH FILTER
-                ----------------------------------------- */
+                ================================================= */
 
                 item {
 
@@ -1010,28 +1106,32 @@ fun TuitionApp(
 
                     Row(
                         horizontalArrangement =
-                            Arrangement.spacedBy(6.dp)
+                            Arrangement.spacedBy(
+                                6.dp
+                            )
                     ) {
 
-                        batches.take(5).forEach {
-                            batch ->
+                        batches
+                            .take(5)
+                            .forEach { batch ->
 
-                            FilterChip(
+                                FilterChip(
 
-                                selected =
-                                    selectedBatch ==
-                                            batch,
+                                    selected =
+                                        selectedBatch ==
+                                                batch,
 
-                                onClick = {
-                                    selectedBatch =
-                                        batch
-                                },
+                                    onClick = {
 
-                                label = {
-                                    Text(batch)
-                                }
-                            )
-                        }
+                                        selectedBatch =
+                                            batch
+                                    },
+
+                                    label = {
+                                        Text(batch)
+                                    }
+                                )
+                            }
                     }
                 }
 
@@ -1046,9 +1146,9 @@ fun TuitionApp(
                     )
                 }
 
-                /* -----------------------------------------
-                   STUDENT LIST
-                ----------------------------------------- */
+                /* =================================================
+                   STUDENTS
+                ================================================= */
 
                 items(
                     visibleStudents,
@@ -1060,10 +1160,13 @@ fun TuitionApp(
                     val monthlyPaid =
                         payments
                             .filter {
+
                                 it.studentId ==
                                         student.id &&
-                                        it.month ==
-                                        thisMonth
+                                it.month.equals(
+                                    thisMonth,
+                                    true
+                                )
                             }
                             .sumOf {
                                 it.amount
@@ -1077,7 +1180,9 @@ fun TuitionApp(
                         )
 
                     Card(
+
                         onClick = {
+
                             selectedStudent =
                                 student
                         },
@@ -1087,14 +1192,19 @@ fun TuitionApp(
                     ) {
 
                         Column(
-                            Modifier.padding(16.dp)
+                            Modifier.padding(
+                                16.dp
+                            )
                         ) {
 
                             Row(
+
                                 modifier =
                                     Modifier.fillMaxWidth(),
+
                                 horizontalArrangement =
-                                    Arrangement.SpaceBetween
+                                    Arrangement
+                                        .SpaceBetween
                             ) {
 
                                 Text(
@@ -1107,22 +1217,16 @@ fun TuitionApp(
                                             .titleMedium
                                 )
 
-                                if (monthlyDue == 0) {
-
-                                    Text(
-                                        "PAID",
-                                        fontWeight =
-                                            FontWeight.Bold
+                                Text(
+                                    if (
+                                        monthlyDue == 0
                                     )
-
-                                } else {
-
-                                    Text(
+                                        "PAID"
+                                    else
                                         "DUE ₹$monthlyDue",
-                                        fontWeight =
-                                            FontWeight.Bold
-                                    )
-                                }
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
                             }
 
                             Text(
@@ -1133,7 +1237,9 @@ fun TuitionApp(
                                 "Monthly fee: ₹${student.monthlyFee}"
                             )
 
-                            if (student.phone.isNotBlank()) {
+                            if (
+                                student.phone.isNotBlank()
+                            ) {
 
                                 Text(
                                     "Phone: ${student.phone}"
@@ -1146,15 +1252,19 @@ fun TuitionApp(
 
                             Row(
                                 horizontalArrangement =
-                                    Arrangement.spacedBy(8.dp)
+                                    Arrangement.spacedBy(
+                                        8.dp
+                                    )
                             ) {
 
                                 Button(
                                     onClick = {
+
                                         collectStudent =
                                             student
                                     }
                                 ) {
+
                                     Text(
                                         "Collect Fee"
                                     )
@@ -1162,28 +1272,29 @@ fun TuitionApp(
 
                                 OutlinedButton(
                                     onClick = {
+
                                         editStudent =
                                             student
                                     }
                                 ) {
-                                    Text("Edit")
+
+                                    Text(
+                                        "Edit"
+                                    )
                                 }
                             }
                         }
                     }
                 }
 
-                /* -----------------------------------------
+                /* =================================================
                    REPORTS
-                ----------------------------------------- */
+                ================================================= */
 
                 item {
 
-                    Spacer(
-                        Modifier.height(8.dp)
-                    )
-
                     Button(
+
                         onClick = {
                             reportOpen = true
                         },
@@ -1198,9 +1309,9 @@ fun TuitionApp(
                     }
                 }
 
-                /* -----------------------------------------
+                /* =================================================
                    BACKUP
-                ----------------------------------------- */
+                ================================================= */
 
                 item {
 
@@ -1214,10 +1325,13 @@ fun TuitionApp(
 
                     Row(
                         horizontalArrangement =
-                            Arrangement.spacedBy(8.dp)
+                            Arrangement.spacedBy(
+                                8.dp
+                            )
                     ) {
 
                         Button(
+
                             onClick = {
 
                                 val uri =
@@ -1230,6 +1344,7 @@ fun TuitionApp(
                                     uri
                                 )
                             }
+
                         ) {
 
                             Text(
@@ -1243,7 +1358,7 @@ fun TuitionApp(
 
                                 (
                                     context as?
-                                            MainActivity
+                                        MainActivity
                                 )?.pickBackup { ok ->
 
                                     Toast.makeText(
@@ -1273,16 +1388,18 @@ fun TuitionApp(
         }
 
         /* =================================================
-           ADD STUDENT
+           ADD
         ================================================= */
 
         if (addOpen) {
 
             StudentEditorDialog(
 
-                title = "Add Student",
+                title =
+                    "Add Student",
 
-                initialStudent = null,
+                initialStudent =
+                    null,
 
                 onDismiss = {
                     addOpen = false
@@ -1303,16 +1420,18 @@ fun TuitionApp(
         }
 
         /* =================================================
-           EDIT STUDENT
+           EDIT
         ================================================= */
 
         editStudent?.let { student ->
 
             StudentEditorDialog(
 
-                title = "Edit Student",
+                title =
+                    "Edit Student",
 
-                initialStudent = student,
+                initialStudent =
+                    student,
 
                 onDismiss = {
                     editStudent = null
@@ -1326,11 +1445,10 @@ fun TuitionApp(
                             if (
                                 it.id ==
                                     updated.id
-                            ) {
+                            )
                                 updated
-                            } else {
+                            else
                                 it
-                            }
                         }
 
                     store.saveStudents(
@@ -1343,14 +1461,15 @@ fun TuitionApp(
         }
 
         /* =================================================
-           STUDENT DETAILS
+           DETAILS
         ================================================= */
 
         selectedStudent?.let { student ->
 
             StudentDetailsDialog(
 
-                student = student,
+                student =
+                    student,
 
                 payments =
                     payments.filter {
@@ -1413,14 +1532,15 @@ fun TuitionApp(
         }
 
         /* =================================================
-           COLLECT FEE
+           COLLECT
         ================================================= */
 
         collectStudent?.let { student ->
 
             CollectFeeDialog(
 
-                student = student,
+                student =
+                    student,
 
                 onDismiss = {
                     collectStudent = null
@@ -1440,9 +1560,7 @@ fun TuitionApp(
                             SimpleDateFormat(
                                 "dd/MM/yyyy",
                                 Locale.getDefault()
-                            ).format(
-                                Date()
-                            )
+                            ).format(Date())
                         )
 
                     payments =
@@ -1457,9 +1575,7 @@ fun TuitionApp(
                                 SimpleDateFormat(
                                     "yyyy",
                                     Locale.getDefault()
-                                ).format(
-                                    Date()
-                                ) +
+                                ).format(Date()) +
                                 "-" +
                                 payments.size
                                     .toString()
@@ -1476,13 +1592,14 @@ fun TuitionApp(
                             receiptNo
                         )
 
-                    collectStudent = null
+                    collectStudent =
+                        null
                 }
             )
         }
 
         /* =================================================
-           RECEIPT DIALOG
+           RECEIPT
         ================================================= */
 
         receiptUri?.let { uri ->
@@ -1515,7 +1632,8 @@ fun TuitionApp(
                                 uri
                             )
 
-                            receiptUri = null
+                            receiptUri =
+                                null
                         }
                     ) {
 
@@ -1535,7 +1653,8 @@ fun TuitionApp(
                                 uri
                             )
 
-                            receiptUri = null
+                            receiptUri =
+                                null
                         }
                     ) {
 
@@ -1555,9 +1674,11 @@ fun TuitionApp(
 
             ReportsDialog(
 
-                students = students,
+                students =
+                    students,
 
-                payments = payments,
+                payments =
+                    payments,
 
                 onDismiss = {
                     reportOpen = false
@@ -1609,246 +1730,7 @@ fun SummaryCard(
 
 /* =========================================================
    STUDENT EDITOR
-========================================================= */
-
-@Composable
-fun StudentEditorDialog(
-    title: String,
-    initialStudent: Student?,
-    onDismiss: () -> Unit,
-    onSave: (Student) -> Unit
-) {
-
-    var name by remember {
-        mutableStateOf(
-            initialStudent?.name ?: ""
-        )
-    }
-
-var cls by remember {
-    mutableStateOf(
-        initialStudent?.className ?: ""
-    )
-}
-
-var classExpanded by remember {
-    mutableStateOf(false)
-}
-
-    var batch by remember {
-        mutableStateOf(
-            initialStudent?.batch ?: ""
-        )
-    }
-
-    var fee by remember {
-        mutableStateOf(
-            initialStudent?.monthlyFee
-                ?.toString() ?: ""
-        )
-    }
-
-    var phone by remember {
-        mutableStateOf(
-            initialStudent?.phone ?: ""
-        )
-    }
-
-    AlertDialog(
-
-        onDismissRequest = onDismiss,
-
-        title = {
-            Text(title)
-        },
-
-        text = {
-
-            Column(
-                modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
-
-                verticalArrangement =
-                    Arrangement.spacedBy(8.dp)
-            ) {
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it
-                    },
-                    label = {
-                        Text(
-                            "Student name"
-                        )
-                    },
-                    singleLine = true
-                )
-
-var classMenuOpen by remember {
-    mutableStateOf(false)
-}
-
-Box {
-
-    OutlinedButton(
-        onClick = {
-            classMenuOpen = true
-        },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-
-        Text(
-            if (cls.isBlank())
-                "Select Class"
-            else
-                cls
-        )
-    }
-
-    DropdownMenu(
-        expanded = classMenuOpen,
-        onDismissRequest = {
-            classMenuOpen = false
-        }
-    ) {
-
-        listOf(
-            "V",
-            "VI",
-            "VII",
-            "VIII",
-            "IX",
-            "X",
-            "Others"
-        ).forEach { className ->
-
-            DropdownMenuItem(
-
-                text = {
-                    Text(className)
-                },
-
-                onClick = {
-
-                    cls = className
-                    classMenuOpen = false
-                }
-            )
-        }
-    }
-}
-if (cls == "Others") {
-
-    OutlinedTextField(
-        value = clsOther,
-        onValueChange = {
-            clsOther = it
-        },
-        label = {
-            Text("Enter class")
-        },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth()
-    )
-}
-
-    OutlinedTextField(
-
-        value = cls,
-
-        onValueChange = {
-            if (cls == "Others") {
-                cls = it
-            }
-        },
-
-        readOnly = cls != "Others",
-
-        label = {
-            Text("Class")
-        },
-
-        trailingIcon = {
-            ExposedDropdownMenuDefaults.TrailingIcon(
-                expanded = classExpanded
-            )
-        },
-
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .menuAnchor(),
-
-        singleLine = true
-    )
-
-    ExposedDropdownMenu(
-
-        expanded = classExpanded,
-
-        onDismissRequest = {
-            classExpanded = false
-        }
-    ) {
-
-        listOf(
-            "V",
-            "VI",
-            "VII",
-            "VIII",
-            "IX",
-            "X",
-            "Others"
-        ).forEach { className ->
-
-            DropdownMenuItem(
-
-                text = {
-                    Text(className)
-                },
-
-                onClick = {
-
-                    cls = className
-
-                    classExpanded = false
-                }
-            )
-        }
-    }
-}
-
-                OutlinedTextField(
-                    value = batch,
-                    onValueChange = {
-                        batch = it
-                    },
-                    label = {
-                        Text("Batch")
-                    },
-                    singleLine = true
-                )
-
-                OutlinedTextField(
-                    value = fee,
-                    onValueChange = {
-                        fee = it
-                    },
-                    label = {
-                        Text(
-                            "Monthly fee"
-                        )
-                    },
-                    keyboardOptions =
-                        KeyboardOptions(
-                            keyboardType =
-                                KeyboardType.Number
-                        ),
-/* =========================================================
-   STUDENT EDITOR
+   CLASS: V-X + OTHERS
 ========================================================= */
 
 @Composable
@@ -1873,26 +1755,36 @@ fun StudentEditorDialog(
         initialStudent?.className ?: ""
 
     var cls by remember {
+
         mutableStateOf(
+
             if (
                 existingClass.isBlank() ||
                 existingClass in standardClasses
             ) {
+
                 existingClass
+
             } else {
+
                 "Others"
             }
         )
     }
 
-    var clsOther by remember {
+    var otherClass by remember {
+
         mutableStateOf(
+
             if (
                 existingClass.isNotBlank() &&
                 existingClass !in standardClasses
             ) {
+
                 existingClass
+
             } else {
+
                 ""
             }
         )
@@ -1903,33 +1795,46 @@ fun StudentEditorDialog(
     }
 
     var name by remember {
+
         mutableStateOf(
             initialStudent?.name ?: ""
         )
     }
 
     var batch by remember {
+
         mutableStateOf(
             initialStudent?.batch ?: ""
         )
     }
 
     var fee by remember {
+
         mutableStateOf(
-            initialStudent?.monthlyFee
-                ?.toString() ?: ""
+            initialStudent
+                ?.monthlyFee
+                ?.toString()
+                ?: ""
         )
     }
 
     var phone by remember {
+
         mutableStateOf(
             initialStudent?.phone ?: ""
         )
     }
 
+    val finalClass =
+        if (cls == "Others")
+            otherClass.trim()
+        else
+            cls.trim()
+
     AlertDialog(
 
-        onDismissRequest = onDismiss,
+        onDismissRequest =
+            onDismiss,
 
         title = {
             Text(title)
@@ -1940,16 +1845,19 @@ fun StudentEditorDialog(
             Column(
 
                 modifier =
-                    Modifier.verticalScroll(
-                        rememberScrollState()
-                    ),
+                    Modifier
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
 
                 verticalArrangement =
-                    Arrangement.spacedBy(8.dp)
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
             ) {
 
                 /* -----------------------------------------
-                   STUDENT NAME
+                   NAME
                 ----------------------------------------- */
 
                 OutlinedTextField(
@@ -1961,7 +1869,9 @@ fun StudentEditorDialog(
                     },
 
                     label = {
-                        Text("Student name")
+                        Text(
+                            "Student name"
+                        )
                     },
 
                     singleLine = true,
@@ -1971,7 +1881,7 @@ fun StudentEditorDialog(
                 )
 
                 /* -----------------------------------------
-                   CLASS
+                   CLASS SELECTOR
                 ----------------------------------------- */
 
                 Box(
@@ -1990,7 +1900,10 @@ fun StudentEditorDialog(
                     ) {
 
                         Text(
-                            if (cls.isBlank())
+
+                            if (
+                                cls.isBlank()
+                            )
                                 "Select Class"
                             else
                                 cls
@@ -2007,30 +1920,34 @@ fun StudentEditorDialog(
                         }
                     ) {
 
-                        standardClasses.forEach {
-                            className ->
+                        standardClasses
+                            .forEach { className ->
 
-                            DropdownMenuItem(
+                                DropdownMenuItem(
 
-                                text = {
-                                    Text(className)
-                                },
+                                    text = {
+                                        Text(
+                                            className
+                                        )
+                                    },
 
-                                onClick = {
+                                    onClick = {
 
-                                    cls =
-                                        className
+                                        cls =
+                                            className
 
-                                    classMenuOpen =
-                                        false
-                                }
-                            )
-                        }
+                                        classMenuOpen =
+                                            false
+                                    }
+                                )
+                            }
 
                         DropdownMenuItem(
 
                             text = {
-                                Text("Others")
+                                Text(
+                                    "Others"
+                                )
                             },
 
                             onClick = {
@@ -2046,21 +1963,26 @@ fun StudentEditorDialog(
                 }
 
                 /* -----------------------------------------
-                   OTHER CLASS
+                   MANUAL CLASS
                 ----------------------------------------- */
 
-                if (cls == "Others") {
+                if (
+                    cls == "Others"
+                ) {
 
                     OutlinedTextField(
 
-                        value = clsOther,
+                        value =
+                            otherClass,
 
                         onValueChange = {
-                            clsOther = it
+                            otherClass = it
                         },
 
                         label = {
-                            Text("Enter class")
+                            Text(
+                                "Enter class"
+                            )
                         },
 
                         placeholder = {
@@ -2089,7 +2011,9 @@ fun StudentEditorDialog(
                     },
 
                     label = {
-                        Text("Batch")
+                        Text(
+                            "Batch"
+                        )
                     },
 
                     singleLine = true,
@@ -2099,7 +2023,7 @@ fun StudentEditorDialog(
                 )
 
                 /* -----------------------------------------
-                   MONTHLY FEE
+                   FEE
                 ----------------------------------------- */
 
                 OutlinedTextField(
@@ -2111,7 +2035,9 @@ fun StudentEditorDialog(
                     },
 
                     label = {
-                        Text("Monthly fee")
+                        Text(
+                            "Monthly fee"
+                        )
                     },
 
                     keyboardOptions =
@@ -2139,7 +2065,9 @@ fun StudentEditorDialog(
                     },
 
                     label = {
-                        Text("Phone")
+                        Text(
+                            "Phone"
+                        )
                     },
 
                     keyboardOptions =
@@ -2156,18 +2084,7 @@ fun StudentEditorDialog(
             }
         },
 
-        /* ---------------------------------------------
-           SAVE
-        --------------------------------------------- */
-
         confirmButton = {
-
-            val finalClass =
-                if (cls == "Others") {
-                    clsOther.trim()
-                } else {
-                    cls.trim()
-                }
 
             Button(
 
@@ -2180,8 +2097,10 @@ fun StudentEditorDialog(
                 onClick = {
 
                     val id =
-                        initialStudent?.id
-                            ?: System.currentTimeMillis()
+                        initialStudent
+                            ?.id
+                            ?: System
+                                .currentTimeMillis()
 
                     onSave(
 
@@ -2204,17 +2123,22 @@ fun StudentEditorDialog(
 
             ) {
 
-                Text("Save")
+                Text(
+                    "Save"
+                )
             }
         },
 
         dismissButton = {
 
             TextButton(
-                onClick = onDismiss
+                onClick =
+                    onDismiss
             ) {
 
-                Text("Cancel")
+                Text(
+                    "Cancel"
+                )
             }
         }
     )
@@ -2241,9 +2165,11 @@ fun StudentDetailsDialog(
 
     AlertDialog(
 
-        onDismissRequest = onDismiss,
+        onDismissRequest =
+            onDismiss,
 
         title = {
+
             Text(
                 student.name,
                 fontWeight =
@@ -2254,13 +2180,16 @@ fun StudentDetailsDialog(
         text = {
 
             Column(
+
                 modifier =
                     Modifier.verticalScroll(
                         rememberScrollState()
                     ),
 
                 verticalArrangement =
-                    Arrangement.spacedBy(7.dp)
+                    Arrangement.spacedBy(
+                        7.dp
+                    )
             ) {
 
                 Text(
@@ -2271,7 +2200,9 @@ fun StudentDetailsDialog(
                     "Monthly fee: ₹${student.monthlyFee}"
                 )
 
-                if (student.phone.isNotBlank()) {
+                if (
+                    student.phone.isNotBlank()
+                ) {
 
                     Text(
                         "Phone: ${student.phone}"
@@ -2292,7 +2223,9 @@ fun StudentDetailsDialog(
                         FontWeight.Bold
                 )
 
-                if (payments.isEmpty()) {
+                if (
+                    payments.isEmpty()
+                ) {
 
                     Text(
                         "No payments recorded."
@@ -2335,7 +2268,8 @@ fun StudentDetailsDialog(
         confirmButton = {
 
             Button(
-                onClick = onCollect
+                onClick =
+                    onCollect
             ) {
 
                 Text(
@@ -2349,7 +2283,8 @@ fun StudentDetailsDialog(
             Row {
 
                 TextButton(
-                    onClick = onEdit
+                    onClick =
+                        onEdit
                 ) {
 
                     Text(
@@ -2371,7 +2306,9 @@ fun StudentDetailsDialog(
         }
     )
 
-    if (deleteConfirm) {
+    if (
+        deleteConfirm
+    ) {
 
         AlertDialog(
 
@@ -2397,10 +2334,11 @@ fun StudentDetailsDialog(
 
                     onClick = {
 
-                        deleteConfirm = false
+                        deleteConfirm =
+                            false
+
                         onDelete()
                     }
-
                 ) {
 
                     Text(
@@ -2413,7 +2351,8 @@ fun StudentDetailsDialog(
 
                 TextButton(
                     onClick = {
-                        deleteConfirm = false
+                        deleteConfirm =
+                            false
                     }
                 ) {
 
@@ -2437,12 +2376,9 @@ fun CollectFeeDialog(
     onSave: (String, Int) -> Unit
 ) {
 
-    val defaultMonth =
-        currentMonth()
-
     var month by remember {
         mutableStateOf(
-            defaultMonth
+            currentMonth()
         )
     }
 
@@ -2455,7 +2391,8 @@ fun CollectFeeDialog(
 
     AlertDialog(
 
-        onDismissRequest = onDismiss,
+        onDismissRequest =
+            onDismiss,
 
         title = {
             Text(
@@ -2467,7 +2404,9 @@ fun CollectFeeDialog(
 
             Column(
                 verticalArrangement =
-                    Arrangement.spacedBy(8.dp)
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
             ) {
 
                 Text(
@@ -2494,7 +2433,10 @@ fun CollectFeeDialog(
                         )
                     },
 
-                    singleLine = true
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 OutlinedTextField(
@@ -2517,7 +2459,10 @@ fun CollectFeeDialog(
                                 KeyboardType.Number
                         ),
 
-                    singleLine = true
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
 
                 Text(
@@ -2543,7 +2488,6 @@ fun CollectFeeDialog(
                         amount.toInt()
                     )
                 }
-
             ) {
 
                 Text(
@@ -2555,7 +2499,8 @@ fun CollectFeeDialog(
         dismissButton = {
 
             TextButton(
-                onClick = onDismiss
+                onClick =
+                    onDismiss
             ) {
 
                 Text(
@@ -2578,29 +2523,37 @@ fun ReportsDialog(
 ) {
 
     var selectedReport by remember {
-        mutableStateOf("Monthly")
+        mutableStateOf(
+            "Monthly"
+        )
     }
 
     val months =
         payments
-            .map { it.month }
+            .map {
+                it.month
+            }
             .distinct()
             .sortedDescending()
 
     AlertDialog(
 
-        onDismissRequest = onDismiss,
+        onDismissRequest =
+            onDismiss,
 
         title = {
+
             Text(
                 "Reports",
-                fontWeight = FontWeight.Bold
+                fontWeight =
+                    FontWeight.Bold
             )
         },
 
         text = {
 
             Column(
+
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -2609,50 +2562,69 @@ fun ReportsDialog(
                         ),
 
                 verticalArrangement =
-                    Arrangement.spacedBy(10.dp)
+                    Arrangement.spacedBy(
+                        10.dp
+                    )
             ) {
 
                 Row(
                     horizontalArrangement =
-                        Arrangement.spacedBy(5.dp)
+                        Arrangement.spacedBy(
+                            5.dp
+                        )
                 ) {
 
                     FilterChip(
+
                         selected =
-                            selectedReport == "Monthly",
+                            selectedReport ==
+                                    "Monthly",
 
                         onClick = {
-                            selectedReport = "Monthly"
+                            selectedReport =
+                                "Monthly"
                         },
 
                         label = {
-                            Text("Monthly")
+                            Text(
+                                "Monthly"
+                            )
                         }
                     )
 
                     FilterChip(
+
                         selected =
-                            selectedReport == "Batch",
+                            selectedReport ==
+                                    "Batch",
 
                         onClick = {
-                            selectedReport = "Batch"
+                            selectedReport =
+                                "Batch"
                         },
 
                         label = {
-                            Text("Batch")
+                            Text(
+                                "Batch"
+                            )
                         }
                     )
 
                     FilterChip(
+
                         selected =
-                            selectedReport == "Students",
+                            selectedReport ==
+                                    "Students",
 
                         onClick = {
-                            selectedReport = "Students"
+                            selectedReport =
+                                "Students"
                         },
 
                         label = {
-                            Text("Students")
+                            Text(
+                                "Students"
+                            )
                         }
                     )
                 }
@@ -2660,17 +2632,23 @@ fun ReportsDialog(
                 HorizontalDivider()
 
                 /* -----------------------------------------
-                   MONTHLY REPORT
+                   MONTHLY
                 ----------------------------------------- */
 
-                if (selectedReport == "Monthly") {
+                if (
+                    selectedReport ==
+                    "Monthly"
+                ) {
 
                     Text(
                         "Monthly Collection",
-                        fontWeight = FontWeight.Bold
+                        fontWeight =
+                            FontWeight.Bold
                     )
 
-                    if (months.isEmpty()) {
+                    if (
+                        months.isEmpty()
+                    ) {
 
                         Text(
                             "No payments recorded."
@@ -2678,12 +2656,14 @@ fun ReportsDialog(
 
                     } else {
 
-                        months.forEach { month ->
+                        months.forEach {
+                            month ->
 
                             val total =
                                 payments
                                     .filter {
-                                        it.month == month
+                                        it.month ==
+                                                month
                                     }
                                     .sumOf {
                                         it.amount
@@ -2692,17 +2672,21 @@ fun ReportsDialog(
                             Card {
 
                                 Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(12.dp),
+
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            12.dp
+                                        ),
 
                                     horizontalArrangement =
                                         Arrangement
                                             .SpaceBetween
                                 ) {
 
-                                    Text(month)
+                                    Text(
+                                        month
+                                    )
 
                                     Text(
                                         "₹$total",
@@ -2714,29 +2698,35 @@ fun ReportsDialog(
                         }
                     }
 
-                }
-
                 /* -----------------------------------------
-                   BATCH REPORT
+                   BATCH
                 ----------------------------------------- */
 
-                else if (selectedReport == "Batch") {
+                } else if (
+                    selectedReport ==
+                    "Batch"
+                ) {
 
                     Text(
                         "Batch-wise Collection",
-                        fontWeight = FontWeight.Bold
+                        fontWeight =
+                            FontWeight.Bold
                     )
 
-                    val batches =
+                    val batchList =
                         students
-                            .map { it.batch }
+                            .map {
+                                it.batch
+                            }
                             .filter {
                                 it.isNotBlank()
                             }
                             .distinct()
                             .sorted()
 
-                    if (batches.isEmpty()) {
+                    if (
+                        batchList.isEmpty()
+                    ) {
 
                         Text(
                             "No batches available."
@@ -2744,11 +2734,13 @@ fun ReportsDialog(
 
                     } else {
 
-                        batches.forEach { batch ->
+                        batchList.forEach {
+                            batch ->
 
                             val batchStudents =
                                 students.filter {
-                                    it.batch == batch
+                                    it.batch ==
+                                            batch
                                 }
 
                             val batchIds =
@@ -2758,8 +2750,8 @@ fun ReportsDialog(
 
                             val total =
                                 payments
-                                    .filter { payment ->
-                                        payment.studentId in
+                                    .filter {
+                                        it.studentId in
                                                 batchIds
                                     }
                                     .sumOf {
@@ -2769,16 +2761,21 @@ fun ReportsDialog(
                             val thisMonth =
                                 currentMonth()
 
-                            val batchPaidStudents =
-                                batchStudents.count { student ->
+                            val paidStudents =
+                                batchStudents.count {
+                                    student ->
 
                                     val paid =
                                         payments
                                             .filter {
+
                                                 it.studentId ==
                                                         student.id &&
-                                                it.month ==
-                                                        thisMonth
+
+                                                it.month.equals(
+                                                    thisMonth,
+                                                    true
+                                                )
                                             }
                                             .sumOf {
                                                 it.amount
@@ -2791,7 +2788,9 @@ fun ReportsDialog(
                             Card {
 
                                 Column(
-                                    Modifier.padding(12.dp),
+                                    Modifier.padding(
+                                        12.dp
+                                    ),
 
                                     verticalArrangement =
                                         Arrangement.spacedBy(
@@ -2814,28 +2813,28 @@ fun ReportsDialog(
                                     )
 
                                     Text(
-                                        "Paid this month: " +
-                                                "$batchPaidStudents"
+                                        "Paid this month: $paidStudents"
                                     )
                                 }
                             }
                         }
                     }
 
-                }
-
                 /* -----------------------------------------
-                   STUDENT REPORT
+                   STUDENTS
                 ----------------------------------------- */
 
-                else {
+                } else {
 
                     Text(
                         "Student Payment History",
-                        fontWeight = FontWeight.Bold
+                        fontWeight =
+                            FontWeight.Bold
                     )
 
-                    if (students.isEmpty()) {
+                    if (
+                        students.isEmpty()
+                    ) {
 
                         Text(
                             "No students available."
@@ -2847,7 +2846,8 @@ fun ReportsDialog(
                             .sortedBy {
                                 it.name.lowercase()
                             }
-                            .forEach { student ->
+                            .forEach {
+                                student ->
 
                                 val studentPayments =
                                     payments.filter {
@@ -2869,8 +2869,9 @@ fun ReportsDialog(
                                         ),
 
                                         verticalArrangement =
-                                            Arrangement
-                                                .spacedBy(5.dp)
+                                            Arrangement.spacedBy(
+                                                5.dp
+                                            )
                                     ) {
 
                                         Text(
@@ -2880,23 +2881,19 @@ fun ReportsDialog(
                                         )
 
                                         Text(
-                                            "${student.className} • " +
-                                                    "${student.batch}"
+                                            "${student.className} • ${student.batch}"
                                         )
 
                                         Text(
-                                            "Monthly fee: " +
-                                                    "₹${student.monthlyFee}"
+                                            "Monthly fee: ₹${student.monthlyFee}"
                                         )
 
                                         Text(
-                                            "Total paid: " +
-                                                    "₹$totalPaid"
+                                            "Total paid: ₹$totalPaid"
                                         )
 
                                         Text(
-                                            "Payments: " +
-                                                    "${studentPayments.size}"
+                                            "Payments: ${studentPayments.size}"
                                         )
                                     }
                                 }
@@ -2909,10 +2906,13 @@ fun ReportsDialog(
         confirmButton = {
 
             TextButton(
-                onClick = onDismiss
+                onClick =
+                    onDismiss
             ) {
 
-                Text("Close")
+                Text(
+                    "Close"
+                )
             }
         }
     )
