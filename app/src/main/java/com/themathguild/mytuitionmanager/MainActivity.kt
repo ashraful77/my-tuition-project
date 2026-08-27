@@ -14,8 +14,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -220,132 +220,8 @@ fun money(
 }
 
 /* =========================================================
-   RECEIPT PDF
-========================================================= */
-
-fun createReceiptPdf(
-    context: Context,
-    student: Student,
-    payment: Payment,
-    receiptNo: String
-): Uri {
-
-    val doc =
-        PdfDocument()
-
-    val page =
-        doc.startPage(
-            PdfDocument.PageInfo
-                .Builder(
-                    595,
-                    842,
-                    1
-                )
-                .create()
-        )
-
-    val canvas =
-        page.canvas
-
-    val paint =
-        Paint().apply {
-            isAntiAlias = true
-        }
-
-    var y = 55f
-
-    fun text(
-        value: String,
-        size: Float = 14f,
-        bold: Boolean = false
-    ) {
-
-        paint.textSize =
-            size
-
-        paint.isFakeBoldText =
-            bold
-
-        canvas.drawText(
-            value,
-            55f,
-            y,
-            paint
-        )
-
-        y +=
-            size + 12f
-    }
-
-    fun separator() {
-
-        canvas.drawLine(
-            55f,
-            y,
-            540f,
-            y,
-            paint
-        )
-
-        y += 20f
-    }
-
-    text(
-        "THE MATH GUILD",
-        25f,
-        true
-    )
-
-    text(
-        "Mastering the Craft of Problem Solving",
-        11f
-    )
-
-    y += 8f
-
-    text(
-        "FEE PAYMENT RECEIPT",
-        20f,
-        true
-    )
-
-    y += 10f
-
-    separator()
-
-    text(
-        "Receipt No.: $receiptNo",
-        13f,
-        true
-    )
-
-    text(
-        "Payment Date: ${payment.date}"
-    )
-
-    y += 8f
-
-    separator()
-
-    text(
-        "STUDENT DETAILS",
-        15f,
-        true
-    )
-
-    text(
-        "Student: ${student.name}",
-        14f,
-        true
-    )
-
-    text(
-        "Class: ${student.className}"
-    )
-
-/* ---------------------------------------------------------
    PROFESSIONAL RECEIPT PDF
---------------------------------------------------------- */
+========================================================= */
 
 fun createReceiptPdf(
     context: Context,
@@ -358,38 +234,48 @@ fun createReceiptPdf(
 
     val pageInfo =
         PdfDocument.PageInfo
-            .Builder(595, 842, 1)
+            .Builder(
+                595,
+                842,
+                1
+            )
             .create()
 
     val page =
         doc.startPage(pageInfo)
 
-    val canvas = page.canvas
+    val canvas =
+        page.canvas
 
-    val paint = Paint().apply {
-        isAntiAlias = true
-    }
+    val paint =
+        Paint().apply {
+            isAntiAlias = true
+        }
 
     val left = 45f
     val right = 550f
-    val width = right - left
 
     var y = 45f
 
     /* -----------------------------------------------------
-       HELPERS
+       TEXT HELPER
     ----------------------------------------------------- */
 
-    fun text(
+    fun drawText(
         value: String,
         x: Float = left,
         size: Float = 13f,
         bold: Boolean = false
     ) {
 
-        paint.style = Paint.Style.FILL
-        paint.textSize = size
-        paint.isFakeBoldText = bold
+        paint.style =
+            Paint.Style.FILL
+
+        paint.textSize =
+            size
+
+        paint.isFakeBoldText =
+            bold
 
         canvas.drawText(
             value,
@@ -399,15 +285,24 @@ fun createReceiptPdf(
         )
     }
 
-    fun centered(
+    /* -----------------------------------------------------
+       CENTERED TEXT
+    ----------------------------------------------------- */
+
+    fun drawCentered(
         value: String,
         size: Float,
         bold: Boolean = false
     ) {
 
-        paint.style = Paint.Style.FILL
-        paint.textSize = size
-        paint.isFakeBoldText = bold
+        paint.style =
+            Paint.Style.FILL
+
+        paint.textSize =
+            size
+
+        paint.isFakeBoldText =
+            bold
 
         val x =
             (595f -
@@ -421,10 +316,17 @@ fun createReceiptPdf(
         )
     }
 
-    fun line() {
+    /* -----------------------------------------------------
+       LINE
+    ----------------------------------------------------- */
 
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1f
+    fun drawLine() {
+
+        paint.style =
+            Paint.Style.STROKE
+
+        paint.strokeWidth =
+            1f
 
         canvas.drawLine(
             left,
@@ -434,16 +336,24 @@ fun createReceiptPdf(
             paint
         )
 
-        paint.style = Paint.Style.FILL
+        paint.style =
+            Paint.Style.FILL
     }
 
-    fun box(
+    /* -----------------------------------------------------
+       BOX
+    ----------------------------------------------------- */
+
+    fun drawBox(
         top: Float,
         bottom: Float
     ) {
 
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 1.5f
+        paint.style =
+            Paint.Style.STROKE
+
+        paint.strokeWidth =
+            1.5f
 
         canvas.drawRect(
             left,
@@ -453,14 +363,15 @@ fun createReceiptPdf(
             paint
         )
 
-        paint.style = Paint.Style.FILL
+        paint.style =
+            Paint.Style.FILL
     }
 
-    /* -----------------------------------------------------
+    /* =====================================================
        HEADER
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    centered(
+    drawCentered(
         "THE MATH GUILD",
         28f,
         true
@@ -468,14 +379,14 @@ fun createReceiptPdf(
 
     y += 23f
 
-    centered(
+    drawCentered(
         "Mastering the Craft of Problem Solving",
         11f
     )
 
     y += 28f
 
-    centered(
+    drawCentered(
         "FEE PAYMENT RECEIPT",
         19f,
         true
@@ -483,22 +394,22 @@ fun createReceiptPdf(
 
     y += 25f
 
-    line()
+    drawLine()
 
     y += 22f
 
-    /* -----------------------------------------------------
+    /* =====================================================
        RECEIPT INFORMATION
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    text(
+    drawText(
         "Receipt No.: $receiptNo",
         left,
         12f,
         true
     )
 
-    text(
+    drawText(
         "Date: ${payment.date}",
         365f,
         12f,
@@ -507,15 +418,15 @@ fun createReceiptPdf(
 
     y += 25f
 
-    line()
+    drawLine()
 
     y += 25f
 
-    /* -----------------------------------------------------
+    /* =====================================================
        STUDENT DETAILS
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    text(
+    drawText(
         "STUDENT DETAILS",
         left,
         15f,
@@ -524,61 +435,70 @@ fun createReceiptPdf(
 
     y += 24f
 
-    box(
-        y - 18f,
-        y + 105f
+    val studentBoxTop =
+        y - 18f
+
+    drawBox(
+        studentBoxTop,
+        studentBoxTop + 125f
     )
 
-    text(
+    drawText(
         "Student Name",
         left + 15f,
         10f
     )
 
-    text(
+    y += 15f
+
+    drawText(
         student.name,
         left + 15f,
         14f,
         true
     )
 
-    y += 35f
+    y += 25f
 
-    text(
+    drawText(
         "Class",
         left + 15f,
         10f
     )
 
-    text(
+    drawText(
+        "Batch",
+        300f,
+        10f
+    )
+
+    y += 15f
+
+    drawText(
         student.className,
         left + 15f,
         13f,
         true
     )
 
-    text(
-        "Batch",
-        300f,
-        10f
-    )
-
-    text(
+    drawText(
         student.batch,
         300f,
         13f,
         true
     )
 
-    y += 35f
+    y += 25f
 
-    text(
+    drawText(
         "Phone",
         left + 15f,
         10f
     )
 
-    text(
+    y += 15f
+
+    drawText(
         if (student.phone.isBlank())
             "Not provided"
         else
@@ -587,13 +507,14 @@ fun createReceiptPdf(
         13f
     )
 
-    y += 40f
+    y =
+        studentBoxTop + 155f
 
-    /* -----------------------------------------------------
+    /* =====================================================
        PAYMENT DETAILS
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    text(
+    drawText(
         "PAYMENT DETAILS",
         left,
         15f,
@@ -602,37 +523,40 @@ fun createReceiptPdf(
 
     y += 25f
 
-    box(
-        y - 18f,
-        y + 125f
+    val paymentBoxTop =
+        y - 18f
+
+    drawBox(
+        paymentBoxTop,
+        paymentBoxTop + 145f
     )
 
-    text(
+    drawText(
         "Fee Month",
         left + 15f,
         11f
     )
 
-    text(
+    drawText(
         payment.month,
         300f,
         13f,
         true
     )
 
-    y += 32f
+    y += 30f
 
-    line()
+    drawLine()
 
     y += 28f
 
-    text(
+    drawText(
         "Monthly Fee",
         left + 15f,
         11f
     )
 
-    text(
+    drawText(
         "₹${student.monthlyFee}",
         430f,
         13f,
@@ -641,18 +565,18 @@ fun createReceiptPdf(
 
     y += 32f
 
-    line()
+    drawLine()
 
     y += 28f
 
-    text(
+    drawText(
         "AMOUNT PAID",
         left + 15f,
         13f,
         true
     )
 
-    text(
+    drawText(
         "₹${payment.amount}",
         410f,
         18f,
@@ -661,23 +585,23 @@ fun createReceiptPdf(
 
     y += 40f
 
-    /* -----------------------------------------------------
-       STATUS
-    ----------------------------------------------------- */
+    /* =====================================================
+       PAYMENT STATUS
+    ===================================================== */
 
-    box(
+    drawBox(
         y - 18f,
         y + 35f
     )
 
-    text(
+    drawText(
         "PAYMENT STATUS",
         left + 15f,
         11f,
         true
     )
 
-    text(
+    drawText(
         "PAID",
         450f,
         14f,
@@ -686,26 +610,26 @@ fun createReceiptPdf(
 
     y += 65f
 
-    /* -----------------------------------------------------
+    /* =====================================================
        THANK YOU
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    centered(
+    drawCentered(
         "Thank you for your payment.",
         12f
     )
 
     y += 40f
 
-    line()
+    drawLine()
 
     y += 35f
 
-    /* -----------------------------------------------------
+    /* =====================================================
        FOOTER
-    ----------------------------------------------------- */
+    ===================================================== */
 
-    text(
+    drawText(
         "Authorized by",
         left,
         10f
@@ -713,7 +637,7 @@ fun createReceiptPdf(
 
     y += 20f
 
-    text(
+    drawText(
         "Ashraful Hoque",
         left,
         13f,
@@ -722,14 +646,13 @@ fun createReceiptPdf(
 
     y += 18f
 
-    text(
+    drawText(
         "The Math Guild",
         left,
-        11f,
-        true
+        11f
     )
 
-    text(
+    drawText(
         "Phone: 9732956571",
         365f,
         11f
@@ -737,14 +660,14 @@ fun createReceiptPdf(
 
     y += 30f
 
-    centered(
+    drawCentered(
         "This is a computer-generated receipt.",
         9f
     )
 
-    /* -----------------------------------------------------
-       FINISH PDF
-    ----------------------------------------------------- */
+    /* =====================================================
+       SAVE PDF
+    ===================================================== */
 
     doc.finishPage(page)
 
@@ -763,6 +686,7 @@ fun createReceiptPdf(
         )
 
     file.outputStream().use { output ->
+
         doc.writeTo(output)
     }
 
@@ -776,7 +700,7 @@ fun createReceiptPdf(
 }
 
 /* =========================================================
-   SHARE
+   SHARE RECEIPT
 ========================================================= */
 
 fun shareReceipt(
@@ -809,6 +733,10 @@ fun shareReceipt(
         )
     )
 }
+
+/* =========================================================
+   WHATSAPP
+========================================================= */
 
 fun shareReceiptWhatsApp(
     context: Context,
@@ -907,6 +835,7 @@ fun exportBackup(
                 "payments",
                 JSONArray(payments)
             )
+
         }.toString(2)
 
     val dir =
@@ -931,6 +860,10 @@ fun exportBackup(
         file
     )
 }
+
+/* =========================================================
+   IMPORT BACKUP
+========================================================= */
 
 fun importBackup(
     context: Context,
@@ -1010,7 +943,8 @@ class MainActivity :
                 ok
             )
 
-            restoreCallback = null
+            restoreCallback =
+                null
         }
 
     fun pickBackup(
@@ -1118,6 +1052,10 @@ fun TuitionApp(
                 it.amount
             }
 
+    /* -----------------------------------------------------
+       OUTSTANDING
+    ----------------------------------------------------- */
+
     fun studentOutstanding(
         student: Student
     ): Int {
@@ -1125,7 +1063,7 @@ fun TuitionApp(
         val studentPayments =
             payments.filter {
                 it.studentId ==
-                    student.id
+                        student.id
             }
 
         val firstPaymentMonth =
@@ -1175,7 +1113,8 @@ fun TuitionApp(
             totalDue +=
                 maxOf(
                     0,
-                    student.monthlyFee - paid
+                    student.monthlyFee -
+                            paid
                 )
 
             month =
@@ -1196,8 +1135,10 @@ fun TuitionApp(
             val paid =
                 payments
                     .filter {
+
                         it.studentId ==
                                 student.id &&
+
                         it.month.equals(
                             thisMonth,
                             true
@@ -1208,7 +1149,7 @@ fun TuitionApp(
                     }
 
             paid >=
-                student.monthlyFee
+                    student.monthlyFee
         }
 
     val unpaidStudents =
@@ -1406,7 +1347,8 @@ fun TuitionApp(
 
                     OutlinedTextField(
 
-                        value = search,
+                        value =
+                            search,
 
                         onValueChange = {
                             search = it
@@ -1496,6 +1438,7 @@ fun TuitionApp(
 
                                 it.studentId ==
                                         student.id &&
+
                                 it.month.equals(
                                     thisMonth,
                                     true
@@ -1536,8 +1479,7 @@ fun TuitionApp(
                                     Modifier.fillMaxWidth(),
 
                                 horizontalArrangement =
-                                    Arrangement
-                                        .SpaceBetween
+                                    Arrangement.SpaceBetween
                             ) {
 
                                 Text(
@@ -1777,7 +1719,7 @@ fun TuitionApp(
 
                             if (
                                 it.id ==
-                                    updated.id
+                                        updated.id
                             )
                                 updated
                             else
@@ -2063,7 +2005,6 @@ fun SummaryCard(
 
 /* =========================================================
    STUDENT EDITOR
-   CLASS: V-X + OTHERS
 ========================================================= */
 
 @Composable
@@ -2094,14 +2035,10 @@ fun StudentEditorDialog(
             if (
                 existingClass.isBlank() ||
                 existingClass in standardClasses
-            ) {
-
+            )
                 existingClass
-
-            } else {
-
+            else
                 "Others"
-            }
         )
     }
 
@@ -2112,14 +2049,10 @@ fun StudentEditorDialog(
             if (
                 existingClass.isNotBlank() &&
                 existingClass !in standardClasses
-            ) {
-
+            )
                 existingClass
-
-            } else {
-
+            else
                 ""
-            }
         )
     }
 
@@ -2189,10 +2122,6 @@ fun StudentEditorDialog(
                     )
             ) {
 
-                /* -----------------------------------------
-                   NAME
-                ----------------------------------------- */
-
                 OutlinedTextField(
 
                     value = name,
@@ -2212,10 +2141,6 @@ fun StudentEditorDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-
-                /* -----------------------------------------
-                   CLASS SELECTOR
-                ----------------------------------------- */
 
                 Box(
                     modifier =
@@ -2295,10 +2220,6 @@ fun StudentEditorDialog(
                     }
                 }
 
-                /* -----------------------------------------
-                   MANUAL CLASS
-                ----------------------------------------- */
-
                 if (
                     cls == "Others"
                 ) {
@@ -2331,10 +2252,6 @@ fun StudentEditorDialog(
                     )
                 }
 
-                /* -----------------------------------------
-                   BATCH
-                ----------------------------------------- */
-
                 OutlinedTextField(
 
                     value = batch,
@@ -2354,10 +2271,6 @@ fun StudentEditorDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-
-                /* -----------------------------------------
-                   FEE
-                ----------------------------------------- */
 
                 OutlinedTextField(
 
@@ -2384,10 +2297,6 @@ fun StudentEditorDialog(
                     modifier =
                         Modifier.fillMaxWidth()
                 )
-
-                /* -----------------------------------------
-                   PHONE
-                ----------------------------------------- */
 
                 OutlinedTextField(
 
@@ -2453,7 +2362,6 @@ fun StudentEditorDialog(
                         )
                     )
                 }
-
             ) {
 
                 Text(
@@ -2964,10 +2872,6 @@ fun ReportsDialog(
 
                 HorizontalDivider()
 
-                /* -----------------------------------------
-                   MONTHLY
-                ----------------------------------------- */
-
                 if (
                     selectedReport ==
                     "Monthly"
@@ -3030,10 +2934,6 @@ fun ReportsDialog(
                             }
                         }
                     }
-
-                /* -----------------------------------------
-                   BATCH
-                ----------------------------------------- */
 
                 } else if (
                     selectedReport ==
@@ -3152,10 +3052,6 @@ fun ReportsDialog(
                             }
                         }
                     }
-
-                /* -----------------------------------------
-                   STUDENTS
-                ----------------------------------------- */
 
                 } else {
 
