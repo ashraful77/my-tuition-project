@@ -2345,15 +2345,14 @@ fun ReportsDialog(
                                     it.id
                                 }
 
-                        val total =
-                            payments
-                                .filter {
-                                    it.studentId
-                                            in ids
-                                }
-                                .sumOf {
-                                    it.amount
-                                }
+val total =
+    payments
+        .filter { payment ->
+            ids.contains(payment.studentId)
+        }
+        .sumOf { payment ->
+            payment.amount
+        }
 
                         Card {
 
