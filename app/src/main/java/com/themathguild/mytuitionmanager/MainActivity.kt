@@ -343,75 +343,408 @@ fun createReceiptPdf(
         "Class: ${student.className}"
     )
 
-    text(
-        "Batch: ${student.batch}"
-    )
+/* ---------------------------------------------------------
+   PROFESSIONAL RECEIPT PDF
+--------------------------------------------------------- */
 
-    if (
-        student.phone.isNotBlank()
+fun createReceiptPdf(
+    context: Context,
+    student: Student,
+    payment: Payment,
+    receiptNo: String
+): Uri {
+
+    val doc = PdfDocument()
+
+    val pageInfo =
+        PdfDocument.PageInfo
+            .Builder(595, 842, 1)
+            .create()
+
+    val page =
+        doc.startPage(pageInfo)
+
+    val canvas = page.canvas
+
+    val paint = Paint().apply {
+        isAntiAlias = true
+    }
+
+    val left = 45f
+    val right = 550f
+    val width = right - left
+
+    var y = 45f
+
+    /* -----------------------------------------------------
+       HELPERS
+    ----------------------------------------------------- */
+
+    fun text(
+        value: String,
+        x: Float = left,
+        size: Float = 13f,
+        bold: Boolean = false
     ) {
 
-        text(
-            "Phone: ${student.phone}"
+        paint.style = Paint.Style.FILL
+        paint.textSize = size
+        paint.isFakeBoldText = bold
+
+        canvas.drawText(
+            value,
+            x,
+            y,
+            paint
         )
     }
 
-    y += 8f
+    fun centered(
+        value: String,
+        size: Float,
+        bold: Boolean = false
+    ) {
 
-    separator()
+        paint.style = Paint.Style.FILL
+        paint.textSize = size
+        paint.isFakeBoldText = bold
+
+        val x =
+            (595f -
+                    paint.measureText(value)) / 2f
+
+        canvas.drawText(
+            value,
+            x,
+            y,
+            paint
+        )
+    }
+
+    fun line() {
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+
+        canvas.drawLine(
+            left,
+            y,
+            right,
+            y,
+            paint
+        )
+
+        paint.style = Paint.Style.FILL
+    }
+
+    fun box(
+        top: Float,
+        bottom: Float
+    ) {
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f
+
+        canvas.drawRect(
+            left,
+            top,
+            right,
+            bottom,
+            paint
+        )
+
+        paint.style = Paint.Style.FILL
+    }
+
+    /* -----------------------------------------------------
+       HEADER
+    ----------------------------------------------------- */
+
+    centered(
+        "THE MATH GUILD",
+        28f,
+        true
+    )
+
+    y += 23f
+
+    centered(
+        "Mastering the Craft of Problem Solving",
+        11f
+    )
+
+    y += 28f
+
+    centered(
+        "FEE PAYMENT RECEIPT",
+        19f,
+        true
+    )
+
+    y += 25f
+
+    line()
+
+    y += 22f
+
+    /* -----------------------------------------------------
+       RECEIPT INFORMATION
+    ----------------------------------------------------- */
+
+    text(
+        "Receipt No.: $receiptNo",
+        left,
+        12f,
+        true
+    )
+
+    text(
+        "Date: ${payment.date}",
+        365f,
+        12f,
+        true
+    )
+
+    y += 25f
+
+    line()
+
+    y += 25f
+
+    /* -----------------------------------------------------
+       STUDENT DETAILS
+    ----------------------------------------------------- */
+
+    text(
+        "STUDENT DETAILS",
+        left,
+        15f,
+        true
+    )
+
+    y += 24f
+
+    box(
+        y - 18f,
+        y + 105f
+    )
+
+    text(
+        "Student Name",
+        left + 15f,
+        10f
+    )
+
+    text(
+        student.name,
+        left + 15f,
+        14f,
+        true
+    )
+
+    y += 35f
+
+    text(
+        "Class",
+        left + 15f,
+        10f
+    )
+
+    text(
+        student.className,
+        left + 15f,
+        13f,
+        true
+    )
+
+    text(
+        "Batch",
+        300f,
+        10f
+    )
+
+    text(
+        student.batch,
+        300f,
+        13f,
+        true
+    )
+
+    y += 35f
+
+    text(
+        "Phone",
+        left + 15f,
+        10f
+    )
+
+    text(
+        if (student.phone.isBlank())
+            "Not provided"
+        else
+            student.phone,
+        left + 15f,
+        13f
+    )
+
+    y += 40f
+
+    /* -----------------------------------------------------
+       PAYMENT DETAILS
+    ----------------------------------------------------- */
 
     text(
         "PAYMENT DETAILS",
+        left,
         15f,
         true
     )
 
-    text(
-        "Fee Month: ${payment.month}"
+    y += 25f
+
+    box(
+        y - 18f,
+        y + 125f
     )
 
     text(
-        "Monthly Fee: Rs. ${student.monthlyFee}"
+        "Fee Month",
+        left + 15f,
+        11f
     )
 
     text(
-        "Amount Paid: Rs. ${payment.amount}",
-        16f,
+        payment.month,
+        300f,
+        13f,
+        true
+    )
+
+    y += 32f
+
+    line()
+
+    y += 28f
+
+    text(
+        "Monthly Fee",
+        left + 15f,
+        11f
+    )
+
+    text(
+        "₹${student.monthlyFee}",
+        430f,
+        13f,
+        true
+    )
+
+    y += 32f
+
+    line()
+
+    y += 28f
+
+    text(
+        "AMOUNT PAID",
+        left + 15f,
+        13f,
         true
     )
 
     text(
-        "Payment Status: PAID",
-        15f,
+        "₹${payment.amount}",
+        410f,
+        18f,
         true
     )
 
-    y += 20f
+    y += 40f
 
-    separator()
+    /* -----------------------------------------------------
+       STATUS
+    ----------------------------------------------------- */
+
+    box(
+        y - 18f,
+        y + 35f
+    )
 
     text(
+        "PAYMENT STATUS",
+        left + 15f,
+        11f,
+        true
+    )
+
+    text(
+        "PAID",
+        450f,
+        14f,
+        true
+    )
+
+    y += 65f
+
+    /* -----------------------------------------------------
+       THANK YOU
+    ----------------------------------------------------- */
+
+    centered(
         "Thank you for your payment.",
-        13f
+        12f
+    )
+
+    y += 40f
+
+    line()
+
+    y += 35f
+
+    /* -----------------------------------------------------
+       FOOTER
+    ----------------------------------------------------- */
+
+    text(
+        "Authorized by",
+        left,
+        10f
     )
 
     y += 20f
 
     text(
         "Ashraful Hoque",
+        left,
         13f,
         true
     )
 
+    y += 18f
+
     text(
         "The Math Guild",
-        12f
+        left,
+        11f,
+        true
     )
 
     text(
         "Phone: 9732956571",
-        12f
+        365f,
+        11f
     )
+
+    y += 30f
+
+    centered(
+        "This is a computer-generated receipt.",
+        9f
+    )
+
+    /* -----------------------------------------------------
+       FINISH PDF
+    ----------------------------------------------------- */
 
     doc.finishPage(page)
 
@@ -429,8 +762,8 @@ fun createReceiptPdf(
             "$receiptNo.pdf"
         )
 
-    file.outputStream().use {
-        doc.writeTo(it)
+    file.outputStream().use { output ->
+        doc.writeTo(output)
     }
 
     doc.close()
