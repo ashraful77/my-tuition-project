@@ -1687,12 +1687,73 @@ var classExpanded by remember {
                     singleLine = true
                 )
 
-ExposedDropdownMenuBox(
-    expanded = classExpanded,
-    onExpandedChange = {
-        classExpanded = !classExpanded
+var classMenuOpen by remember {
+    mutableStateOf(false)
+}
+
+Box {
+
+    OutlinedButton(
+        onClick = {
+            classMenuOpen = true
+        },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+
+        Text(
+            if (cls.isBlank())
+                "Select Class"
+            else
+                cls
+        )
     }
-) {
+
+    DropdownMenu(
+        expanded = classMenuOpen,
+        onDismissRequest = {
+            classMenuOpen = false
+        }
+    ) {
+
+        listOf(
+            "V",
+            "VI",
+            "VII",
+            "VIII",
+            "IX",
+            "X",
+            "Others"
+        ).forEach { className ->
+
+            DropdownMenuItem(
+
+                text = {
+                    Text(className)
+                },
+
+                onClick = {
+
+                    cls = className
+                    classMenuOpen = false
+                }
+            )
+        }
+    }
+}
+if (cls == "Others") {
+
+    OutlinedTextField(
+        value = clsOther,
+        onValueChange = {
+            clsOther = it
+        },
+        label = {
+            Text("Enter class")
+        },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
 
     OutlinedTextField(
 
