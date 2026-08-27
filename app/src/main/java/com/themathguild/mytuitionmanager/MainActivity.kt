@@ -1625,11 +1625,15 @@ fun StudentEditorDialog(
         )
     }
 
-    var cls by remember {
-        mutableStateOf(
-            initialStudent?.className ?: ""
-        )
-    }
+var cls by remember {
+    mutableStateOf(
+        initialStudent?.className ?: ""
+    )
+}
+
+var classExpanded by remember {
+    mutableStateOf(false)
+}
 
     var batch by remember {
         mutableStateOf(
@@ -1683,16 +1687,78 @@ fun StudentEditorDialog(
                     singleLine = true
                 )
 
-                OutlinedTextField(
-                    value = cls,
-                    onValueChange = {
-                        cls = it
-                    },
-                    label = {
-                        Text("Class")
-                    },
-                    singleLine = true
-                )
+ExposedDropdownMenuBox(
+    expanded = classExpanded,
+    onExpandedChange = {
+        classExpanded = !classExpanded
+    }
+) {
+
+    OutlinedTextField(
+
+        value = cls,
+
+        onValueChange = {
+            if (cls == "Others") {
+                cls = it
+            }
+        },
+
+        readOnly = cls != "Others",
+
+        label = {
+            Text("Class")
+        },
+
+        trailingIcon = {
+            ExposedDropdownMenuDefaults.TrailingIcon(
+                expanded = classExpanded
+            )
+        },
+
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .menuAnchor(),
+
+        singleLine = true
+    )
+
+    ExposedDropdownMenu(
+
+        expanded = classExpanded,
+
+        onDismissRequest = {
+            classExpanded = false
+        }
+    ) {
+
+        listOf(
+            "V",
+            "VI",
+            "VII",
+            "VIII",
+            "IX",
+            "X",
+            "Others"
+        ).forEach { className ->
+
+            DropdownMenuItem(
+
+                text = {
+                    Text(className)
+                },
+
+                onClick = {
+
+                    cls = className
+
+                    classExpanded = false
+                }
+            )
+        }
+    }
+}
 
                 OutlinedTextField(
                     value = batch,
