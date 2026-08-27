@@ -2266,55 +2266,340 @@ fun ReportsDialog(
 
                     if (months.isEmpty()) {
 
+@Composable
+fun ReportsDialog(
+    students: List<Student>,
+    payments: List<Payment>,
+    onDismiss: () -> Unit
+) {
+
+    var selectedReport by remember {
+        mutableStateOf("Monthly")
+    }
+
+    var selectedMonth by remember {
+        mutableStateOf(currentMonth())
+    }
+
+    val months =
+        (payments.map { it.month } + currentMonth())
+            .distinct()
+            .sortedWith(
+                compareByDescending<String> {
+                    monthKey(it)
+                }
+            )
+
+    val monthPayments =
+        payments.filter {
+            it.month.equals(
+                selectedMonth,
+                ignoreCase = true
+            )
+        }
+
+    val monthCollection =
+        monthPayments.sumOf {
+            it.amount
+        }
+
+    val paidStudentIds =
+        monthPayments
+            .filter { payment ->
+                val student =
+                    students.find {
+                        it.id == payment.studentId
+                    }
+
+                student != null &&
+                        monthPayments
+                            .filter {
+                                it.studentId ==
+                                        student.id
+                            }
+                            .sumOf {
+                                it.amount
+                            } >=
+                        student.monthlyFee
+            }
+            .map {
+                it.studentId
+            }
+            .distinct()
+
+    val studentsPaid =
+        paidStudentIds.size
+
+    val studentsUnpaid =
+        maxOf(
+            0,
+            students.size - studentsPaid
+        )
+
+    val monthOutstanding =
+        students.sumOf { student ->
+
+            val paid =
+                monthPayments
+                    .filter {
+                        it.studentId ==
+                                student.id
+                    }
+                    .sumOf {
+                        it.amount
+                    }
+
+            maxOf(
+                0,
+                student.monthlyFee - paid
+            )
+        }
+
+    AlertDialog(
+
+        onDismissRequest = onDismiss,
+
+        title = {
+            Text(
+                "Reports",
+                fontWeight =
+                    FontWeight.Bold
+            )
+        },
+
+        text = {
+
+            Column(
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+
+                /* -----------------------------------------
+                   REPORT TYPE
+                ----------------------------------------- */
+
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(5.dp)
+                ) {
+
+                    FilterChip(
+
+                        selected =
+                            selectedReport ==
+                                    "Monthly",
+
+                        onClick = {
+                            selectedReport =
+                                "Monthly"
+                        },
+
+                        label = {
+                            Text(
+                                "Monthly"
+                            )
+                        }
+                    )
+
+                    FilterChip(
+
+                        selected =
+                            selectedReport ==
+                                    "Batch",
+
+                        onClick = {
+                            selectedReport =
+                                "Batch"
+                        },
+
+                        label = {
+                            Text(
+                                "Batch"
+                            )
+                        }
+                    )
+
+                    FilterChip(
+
+                        selected =
+                            selectedReport ==
+                                    "Students",
+
+                        onClick = {
+                            selectedReport =
+                                "Students"
+                        },
+
+                        label = {
+                            Text(
+                                "Students"
+                            )
+                        }
+                    )
+                }
+
+                /* -----------------------------------------
+                   MONTH SELECTION
+                ----------------------------------------- */
+
+                if (selectedReport ==
+                    "Monthly"
+                ) {
+
+                    Text(
+                        "Select Month",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(6.dp)
+                    ) {
+
+                        months
+                            .take(4)
+                            .forEach { month ->
+
+                                FilterChip(
+
+                                    selected =
+                                        selectedMonth
+                                                .equals(
+                                                    month,
+                                                    ignoreCase =
+                                                        true
+                                                ),
+
+                                    onClick = {
+                                        selectedMonth =
+                                            month
+                                    },
+
+                                    label = {
+                                        Text(
+                                            month
+                                        )
+                                    }
+                                )
+                            }
+                    }
+
+                    HorizontalDivider()
+
+                    Text(
+                        selectedMonth,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleMedium,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    /* -------------------------------------
+                       MONTHLY SUMMARY
+                    ------------------------------------- */
+
+                    SummaryCard(
+                        "Collection",
+                        "₹$monthCollection",
+                        Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+
+                        SummaryCard(
+                            "Paid Students",
+                            studentsPaid.toString(),
+                            Modifier.weight(1f)
+                        )
+
+                        SummaryCard(
+                            "Unpaid Students",
+                            studentsUnpaid.toString(),
+                            Modifier.weight(1f)
+                        )
+                    }
+
+                    SummaryCard(
+                        "Outstanding",
+                        "₹$monthOutstanding",
+                        Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        "Payments",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (monthPayments.isEmpty()) {
+
                         Text(
-                            "No payments recorded."
+                            "No payments recorded for this month."
                         )
 
                     } else {
 
-                        months.forEach { month ->
+                        monthPayments
+                            .sortedByDescending {
+                                it.date
+                            }
+                            .forEach { payment ->
 
-                            val total =
-                                payments
-                                    .filter {
-                                        it.month ==
-                                                month
+                                val student =
+                                    students.find {
+                                        it.id ==
+                                                payment.studentId
                                     }
-                                    .sumOf {
-                                        it.amount
-                                    }
 
-                            Card {
+                                Card {
 
-                                Row(
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(
+                                    Column(
+                                        Modifier.padding(
                                             12.dp
-                                        ),
-                                    horizontalArrangement =
-                                        Arrangement
-                                            .SpaceBetween
-                                ) {
+                                        )
+                                    ) {
 
-                                    Text(
-                                        month
-                                    )
+                                        Text(
+                                            student?.name
+                                                ?: "Unknown Student",
+                                            fontWeight =
+                                                FontWeight.Bold
+                                        )
 
-                                    Text(
-                                        "₹$total",
-                                        fontWeight =
-                                            FontWeight.Bold
-                                    )
+                                        Text(
+                                            "Amount: ₹${payment.amount}"
+                                        )
+
+                                        Text(
+                                            "Date: ${payment.date}"
+                                        )
+                                    }
                                 }
                             }
-                        }
                     }
 
                 } else if (
                     selectedReport ==
                     "Batch"
                 ) {
+
+                    /* -------------------------------------
+                       BATCH REPORT
+                    ------------------------------------- */
 
                     Text(
                         "Batch-wise Collection",
@@ -2333,71 +2618,56 @@ fun ReportsDialog(
                             .distinct()
                             .sorted()
 
-                    batches.forEach { batch ->
+                    if (batches.isEmpty()) {
 
-                        val ids =
-                            students
-                                .filter {
+                        Text(
+                            "No batches available."
+                        )
+
+                    } else {
+
+                        batches.forEach { batch ->
+
+                            val batchStudents =
+                                students.filter {
                                     it.batch ==
                                             batch
                                 }
-                                .map {
+
+                            val ids =
+                                batchStudents.map {
                                     it.id
                                 }
-
-val total =
-    payments
-        .filter { payment ->
-            ids.contains(payment.studentId)
-        }
-        .sumOf { payment ->
-            payment.amount
-        }
-
-                        Card {
-
-                            Column(
-                                Modifier.padding(
-                                    12.dp
-                                )
-                            ) {
-
-                                Text(
-                                    "Batch $batch",
-                                    fontWeight =
-                                        FontWeight.Bold
-                                )
-
-                                Text(
-                                    "Collected: ₹$total"
-                                )
-                            }
-                        }
-                    }
-
-                } else {
-
-                    Text(
-                        "Student Payment History",
-                        fontWeight =
-                            FontWeight.Bold
-                    )
-
-                    students
-                        .sortedBy {
-                            it.name
-                        }
-                        .forEach { student ->
 
                             val total =
                                 payments
                                     .filter {
-                                        it.studentId ==
-                                                student.id
+                                        ids.contains(
+                                            it.studentId
+                                        )
                                     }
                                     .sumOf {
                                         it.amount
                                     }
+
+                            val batchPaidStudents =
+                                batchStudents.count { student ->
+
+                                    val paid =
+                                        payments
+                                            .filter {
+                                                it.studentId ==
+                                                        student.id &&
+                                                        it.month ==
+                                                        currentMonth()
+                                            }
+                                            .sumOf {
+                                                it.amount
+                                            }
+
+                                    paid >=
+                                            student.monthlyFee
+                                }
 
                             Card {
 
@@ -2408,21 +2678,129 @@ val total =
                                 ) {
 
                                     Text(
-                                        student.name,
+                                        "Batch $batch",
                                         fontWeight =
                                             FontWeight.Bold
                                     )
 
                                     Text(
-                                        "${student.className} • ${student.batch}"
+                                        "Students: ${batchStudents.size}"
                                     )
 
                                     Text(
-                                        "Total paid: ₹$total"
+                                        "Collected: ₹$total"
+                                    )
+
+                                    Text(
+                                        "Paid this month: $batchPaidStudents"
                                     )
                                 }
                             }
                         }
+                    }
+
+                } else {
+
+                    /* -------------------------------------
+                       STUDENT REPORT
+                    ------------------------------------- */
+
+                    Text(
+                        "Student Payment History",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (students.isEmpty()) {
+
+                        Text(
+                            "No students available."
+                        )
+
+                    } else {
+
+                        students
+                            .sortedBy {
+                                it.name.lowercase()
+                            }
+                            .forEach { student ->
+
+                                val studentPayments =
+                                    payments.filter {
+                                        it.studentId ==
+                                                student.id
+                                    }
+
+                                val totalPaid =
+                                    studentPayments
+                                        .sumOf {
+                                            it.amount
+                                        }
+
+                                Card {
+
+                                    Column(
+                                        Modifier.padding(
+                                            12.dp
+                                        ),
+
+                                        verticalArrangement =
+                                            Arrangement
+                                                .spacedBy(5.dp)
+                                    ) {
+
+                                        Text(
+                                            student.name,
+                                            fontWeight =
+                                                FontWeight.Bold
+                                        )
+
+                                        Text(
+                                            "${student.className} • ${student.batch}"
+                                        )
+
+                                        Text(
+                                            "Total paid: ₹$totalPaid"
+                                        )
+
+                                        Text(
+                                            "Outstanding: ₹${
+                                                calculateStudentOutstandingForReport(
+                                                    student,
+                                                    studentPayments
+                                                )
+                                            }"
+                                        )
+
+                                        HorizontalDivider()
+
+                                        if (
+                                            studentPayments
+                                                .isEmpty()
+                                        ) {
+
+                                            Text(
+                                                "No payments recorded."
+                                            )
+
+                                        } else {
+
+                                            studentPayments
+                                                .sortedByDescending {
+                                                    it.date
+                                                }
+                                                .forEach {
+                                                    payment ->
+
+                                                    Text(
+                                                        "${payment.month}: ₹${payment.amount} • ${payment.date}"
+                                                    )
+                                                }
+                                        }
+                                    }
+                                }
+                            }
+                    }
                 }
             }
         },
