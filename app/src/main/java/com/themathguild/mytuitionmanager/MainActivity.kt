@@ -1,29 +1,35 @@
 package com.themathguild.mytuitionmanager
 
 import android.content.Context
-import android.os.Bundle
 import android.content.Intent
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
-import android.app.Activity
-import android.content.ContextWrapper
-import androidx.core.content.FileProvider
-import java.io.File
+import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.util.*
 
 data class Student(
@@ -43,12 +49,18 @@ data class Payment(
 )
 
 class LocalStore(context: Context) {
-    private val prefs = context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
+
+    private val prefs =
+        context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
 
     fun loadStudents(): List<Student> {
-        val a = JSONArray(prefs.getString("students", "[]"))
+        val a = JSONArray(
+            prefs.getString("students", "[]")
+        )
+
         return List(a.length()) { i ->
             val o = a.getJSONObject(i)
+
             Student(
                 o.getLong("id"),
                 o.getString("name"),
@@ -61,24 +73,36 @@ class LocalStore(context: Context) {
     }
 
     fun saveStudents(list: List<Student>) {
+
         val a = JSONArray()
+
         list.forEach {
-            a.put(JSONObject().apply {
-                put("id", it.id)
-                put("name", it.name)
-                put("className", it.className)
-                put("batch", it.batch)
-                put("monthlyFee", it.monthlyFee)
-                put("phone", it.phone)
-            })
+            a.put(
+                JSONObject().apply {
+                    put("id", it.id)
+                    put("name", it.name)
+                    put("className", it.className)
+                    put("batch", it.batch)
+                    put("monthlyFee", it.monthlyFee)
+                    put("phone", it.phone)
+                }
+            )
         }
-        prefs.edit().putString("students", a.toString()).apply()
+
+        prefs.edit()
+            .putString("students", a.toString())
+            .apply()
     }
 
     fun loadPayments(): List<Payment> {
-        val a = JSONArray(prefs.getString("payments", "[]"))
+
+        val a = JSONArray(
+            prefs.getString("payments", "[]")
+        )
+
         return List(a.length()) { i ->
             val o = a.getJSONObject(i)
+
             Payment(
                 o.getLong("studentId"),
                 o.getString("month"),
@@ -89,18 +113,60 @@ class LocalStore(context: Context) {
     }
 
     fun savePayments(list: List<Payment>) {
+
         val a = JSONArray()
+
         list.forEach {
-            a.put(JSONObject().apply {
-                put("studentId", it.studentId)
-                put("month", it.month)
-                put("amount", it.amount)
-                put("date", it.date)
-            })
+            a.put(
+                JSONObject().apply {
+                    put("studentId", it.studentId)
+                    put("month", it.month)
+                    put("amount", it.amount)
+                    put("date", it.date)
+                }
+            )
         }
-        prefs.edit().putString("payments", a.toString()).apply()
+
+        prefs.edit()
+            .putString("payments", a.toString())
+            .apply()
     }
 }
+
+/* ---------------------------------------------------------
+   DATE HELPERS
+--------------------------------------------------------- */
+
+fun currentMonth(): String {
+
+    return SimpleDateFormat(
+        "MMMM yyyy",
+        Locale.getDefault()
+    ).format(Date())
+}
+
+fun monthKey(month: String): YearMonth? {
+
+    return try {
+        YearMonth.parse(
+            month,
+            DateTimeFormatter.ofPattern(
+                "MMMM yyyy",
+                Locale.ENGLISH
+            )
+        )
+    } catch (_: Exception) {
+        null
+    }
+}
+
+fun money(value: Int): String {
+    return "₹$value"
+}
+
+/* ---------------------------------------------------------
+   RECEIPT PDF
+--------------------------------------------------------- */
 
 fun createReceiptPdf(
     context: Context,
@@ -108,46 +174,195 @@ fun createReceiptPdf(
     payment: Payment,
     receiptNo: String
 ): Uri {
+
     val doc = PdfDocument()
+
     val page = doc.startPage(
-        PdfDocument.PageInfo.Builder(595, 842, 1).create()
+        PdfDocument.PageInfo
+            .Builder(595, 842, 1)
+            .create()
     )
+
     val canvas = page.canvas
-    val paint = Paint().apply { isAntiAlias = true }
+
+    val paint = Paint().apply {
+        isAntiAlias = true
+    }
+
     var y = 55f
 
-    fun line(text: String, size: Float = 14f, bold: Boolean = false) {
+    fun text(
+        value: String,
+        size: Float = 14f,
+        bold: Boolean = false
+    ) {
+
         paint.textSize = size
         paint.isFakeBoldText = bold
-        canvas.drawText(text, 45f, y, paint)
+
+        canvas.drawText(
+            value,
+            55f,
+            y,
+            paint
+        )
+
         y += size + 12f
     }
 
-    line("THE MATH GUILD", 22f, true)
-    line("Mastering the Craft of Problem Solving", 11f)
-    line("Fee Payment Receipt", 18f, true)
+    fun line() {
+
+        canvas.drawLine(
+            55f,
+            y,
+            540f,
+            y,
+            paint
+        )
+
+        y += 20f
+    }
+
+    text(
+        "THE MATH GUILD",
+        25f,
+        true
+    )
+
+    text(
+        "Mastering the Craft of Problem Solving",
+        11f
+    )
+
+    y += 8f
+
+    text(
+        "FEE PAYMENT RECEIPT",
+        20f,
+        true
+    )
+
     y += 10f
-    line("Receipt No.: $receiptNo")
-    line("Payment Date: ${payment.date}")
+
+    line()
+
+    text(
+        "Receipt No.: $receiptNo",
+        13f,
+        true
+    )
+
+    text(
+        "Payment Date: ${payment.date}"
+    )
+
     y += 8f
-    line("Student: ${student.name}", 15f, true)
-    line("Class: ${student.className}")
-    line("Batch: ${student.batch}")
+
+    line()
+
+    text(
+        "STUDENT DETAILS",
+        15f,
+        true
+    )
+
+    text(
+        "Student: ${student.name}",
+        14f,
+        true
+    )
+
+    text(
+        "Class: ${student.className}"
+    )
+
+    text(
+        "Batch: ${student.batch}"
+    )
+
+    if (student.phone.isNotBlank()) {
+        text(
+            "Phone: ${student.phone}"
+        )
+    }
+
     y += 8f
-    line("Fee Month: ${payment.month}")
-    line("Amount Paid: Rs. ${payment.amount}", 16f, true)
-    line("Payment Status: PAID", 15f, true)
-    y += 18f
-    line("Thank you for your payment.")
+
+    line()
+
+    text(
+        "PAYMENT DETAILS",
+        15f,
+        true
+    )
+
+    text(
+        "Fee Month: ${payment.month}"
+    )
+
+    text(
+        "Monthly Fee: Rs. ${student.monthlyFee}"
+    )
+
+    text(
+        "Amount Paid: Rs. ${payment.amount}",
+        16f,
+        true
+    )
+
+    text(
+        "Payment Status: PAID",
+        15f,
+        true
+    )
+
     y += 20f
-    line("Ashraful Hoque", 13f, true)
-    line("Phone: 9732956571", 12f)
+
+    line()
+
+    text(
+        "Thank you for your payment.",
+        13f
+    )
+
+    y += 20f
+
+    text(
+        "Ashraful Hoque",
+        13f,
+        true
+    )
+
+    text(
+        "The Math Guild",
+        12f
+    )
+
+    text(
+        "Phone: 9732956571",
+        12f
+    )
 
     doc.finishPage(page)
 
-    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
-    val file = File(dir, "$receiptNo.pdf")
-    file.outputStream().use { doc.writeTo(it) }
+    val dir =
+        File(
+            context.cacheDir,
+            "receipts"
+        ).apply {
+            mkdirs()
+        }
+
+    val file =
+        File(
+            dir,
+            "$receiptNo.pdf"
+        )
+
+    file.outputStream().use {
+        doc.writeTo(it)
+    }
+
     doc.close()
 
     return FileProvider.getUriForFile(
@@ -157,29 +372,146 @@ fun createReceiptPdf(
     )
 }
 
-fun shareReceipt(context: Context, uri: Uri) {
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "application/pdf"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, "Share receipt"))
+/* ---------------------------------------------------------
+   SHARE RECEIPT
+--------------------------------------------------------- */
+
+fun shareReceipt(
+    context: Context,
+    uri: Uri
+) {
+
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
+
+            type = "application/pdf"
+
+            putExtra(
+                Intent.EXTRA_STREAM,
+                uri
+            )
+
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+
+    context.startActivity(
+        Intent.createChooser(
+            intent,
+            "Share Receipt"
+        )
+    )
 }
 
-fun exportBackup(context: Context): Uri {
-    val prefs = context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
-    val students = prefs.getString("students", "[]") ?: "[]"
-    val payments = prefs.getString("payments", "[]") ?: "[]"
+fun shareReceiptWhatsApp(
+    context: Context,
+    uri: Uri
+) {
 
-    val json = JSONObject().apply {
-        put("app", "My Tuition Manager")
-        put("version", "1.3")
-        put("students", JSONArray(students))
-        put("payments", JSONArray(payments))
-    }.toString(2)
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
 
-    val dir = File(context.cacheDir, "backup").apply { mkdirs() }
-    val file = File(dir, "MyTuitionManager_Backup.json")
+            type = "application/pdf"
+
+            putExtra(
+                Intent.EXTRA_STREAM,
+                uri
+            )
+
+            setPackage("com.whatsapp")
+
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+
+    try {
+
+        context.startActivity(intent)
+
+    } catch (_: Exception) {
+
+        Toast.makeText(
+            context,
+            "WhatsApp is not available. Choose another sharing option.",
+            Toast.LENGTH_LONG
+        ).show()
+    }
+}
+
+/* ---------------------------------------------------------
+   BACKUP
+--------------------------------------------------------- */
+
+fun exportBackup(
+    context: Context
+): Uri {
+
+    val prefs =
+        context.getSharedPreferences(
+            "tuition_data",
+            Context.MODE_PRIVATE
+        )
+
+    val students =
+        prefs.getString(
+            "students",
+            "[]"
+        ) ?: "[]"
+
+    val payments =
+        prefs.getString(
+            "payments",
+            "[]"
+        ) ?: "[]"
+
+    val json =
+        JSONObject().apply {
+
+            put(
+                "app",
+                "My Tuition Manager"
+            )
+
+            put(
+                "version",
+                "2.0"
+            )
+
+            put(
+                "backupDate",
+                SimpleDateFormat(
+                    "dd/MM/yyyy HH:mm",
+                    Locale.getDefault()
+                ).format(Date())
+            )
+
+            put(
+                "students",
+                JSONArray(students)
+            )
+
+            put(
+                "payments",
+                JSONArray(payments)
+            )
+        }.toString(2)
+
+    val dir =
+        File(
+            context.cacheDir,
+            "backup"
+        ).apply {
+            mkdirs()
+        }
+
+    val file =
+        File(
+            dir,
+            "MyTuitionManager_Backup.json"
+        )
+
     file.writeText(json)
 
     return FileProvider.getUriForFile(
@@ -189,139 +521,412 @@ fun exportBackup(context: Context): Uri {
     )
 }
 
-fun importBackup(context: Context, uri: Uri): Boolean {
-    return try {
-        val json = context.contentResolver
-            .openInputStream(uri)
-            ?.bufferedReader()
-            ?.use { it.readText() }
-            ?: return false
+fun importBackup(
+    context: Context,
+    uri: Uri
+): Boolean {
 
-        val obj = JSONObject(json)
-        val prefs = context.getSharedPreferences(
-            "tuition_data",
-            Context.MODE_PRIVATE
-        )
+    return try {
+
+        val json =
+            context.contentResolver
+                .openInputStream(uri)
+                ?.bufferedReader()
+                ?.use {
+                    it.readText()
+                }
+                ?: return false
+
+        val obj =
+            JSONObject(json)
+
+        val prefs =
+            context.getSharedPreferences(
+                "tuition_data",
+                Context.MODE_PRIVATE
+            )
 
         prefs.edit()
             .putString(
                 "students",
-                obj.optJSONArray("students")?.toString() ?: "[]"
+                obj.optJSONArray(
+                    "students"
+                )?.toString() ?: "[]"
             )
             .putString(
                 "payments",
-                obj.optJSONArray("payments")?.toString() ?: "[]"
+                obj.optJSONArray(
+                    "payments"
+                )?.toString() ?: "[]"
             )
             .apply()
 
         true
+
     } catch (_: Exception) {
+
         false
     }
 }
 
+/* ---------------------------------------------------------
+   MAIN ACTIVITY
+--------------------------------------------------------- */
+
 class MainActivity : ComponentActivity() {
-    private var restoreCallback: ((Boolean) -> Unit)? = null
 
-    private val restoreLauncher = registerForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        val ok = uri?.let { importBackup(this, it) } ?: false
-        restoreCallback?.invoke(ok)
-        restoreCallback = null
-    }
+    private var restoreCallback:
+            ((Boolean) -> Unit)? = null
 
-    fun pickBackup(callback: (Boolean) -> Unit) {
+    private val restoreLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri ->
+
+            val ok =
+                uri?.let {
+                    importBackup(
+                        this,
+                        it
+                    )
+                } ?: false
+
+            restoreCallback?.invoke(ok)
+
+            restoreCallback = null
+        }
+
+    fun pickBackup(
+        callback: (Boolean) -> Unit
+    ) {
+
         restoreCallback = callback
-        restoreLauncher.launch(arrayOf("application/json", "text/*"))
+
+        restoreLauncher.launch(
+            arrayOf(
+                "application/json",
+                "text/*"
+            )
+        )
     }
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
+    override fun onCreate(
+        savedInstanceState: Bundle?
+    ) {
+
+        super.onCreate(
+            savedInstanceState
+        )
+
         setContent {
-            TuitionApp(LocalStore(this))
+
+            TuitionApp(
+                LocalStore(this)
+            )
         }
     }
 }
 
+/* ---------------------------------------------------------
+   MAIN APP
+--------------------------------------------------------- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TuitionApp(store: LocalStore) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var lastReceiptUri by remember { mutableStateOf<Uri?>(null) }
+fun TuitionApp(
+    store: LocalStore
+) {
 
-    var students by remember { mutableStateOf(store.loadStudents()) }
-    var payments by remember { mutableStateOf(store.loadPayments()) }
-    var selected by remember { mutableStateOf<Student?>(null) }
-    var addOpen by remember { mutableStateOf(false) }
-    var collectOpen by remember { mutableStateOf<Student?>(null) }
+    val context =
+        androidx.compose.ui.platform
+            .LocalContext.current
 
-    val currentMonth =
-        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(Date())
-
-    val currentPaid =
-        payments.filter { it.month == currentMonth }.sumOf { it.amount }
-
-    val currentDue = students.sumOf { s ->
-        maxOf(
-            0,
-            s.monthlyFee - payments
-                .filter {
-                    it.studentId == s.id &&
-                    it.month == currentMonth
-                }
-                .sumOf { it.amount }
+    var students by remember {
+        mutableStateOf(
+            store.loadStudents()
         )
     }
 
+    var payments by remember {
+        mutableStateOf(
+            store.loadPayments()
+        )
+    }
+
+    var search by remember {
+        mutableStateOf("")
+    }
+
+    var selectedBatch by remember {
+        mutableStateOf("All")
+    }
+
+    var selectedStudent by remember {
+        mutableStateOf<Student?>(null)
+    }
+
+    var addOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var editStudent by remember {
+        mutableStateOf<Student?>(null)
+    }
+
+    var collectStudent by remember {
+        mutableStateOf<Student?>(null)
+    }
+
+    var reportOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var backupOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var receiptUri by remember {
+        mutableStateOf<Uri?>(null)
+    }
+
+    val thisMonth =
+        currentMonth()
+
+    val currentPaid =
+        payments
+            .filter {
+                it.month == thisMonth
+            }
+            .sumOf {
+                it.amount
+            }
+
+    /* -----------------------------------------------------
+       TOTAL OUTSTANDING INCLUDING PREVIOUS MONTHS
+    ----------------------------------------------------- */
+
+    fun studentOutstanding(
+        student: Student
+    ): Int {
+
+        val studentPayments =
+            payments.filter {
+                it.studentId == student.id
+            }
+
+        val firstMonth =
+            try {
+
+                YearMonth.from(
+                    java.time.Instant
+                        .ofEpochMilli(student.id)
+                        .atZone(
+                            java.time.ZoneId
+                                .systemDefault()
+                        )
+                )
+
+            } catch (_: Exception) {
+
+                YearMonth.now()
+            }
+
+        val now =
+            YearMonth.now()
+
+        var month =
+            firstMonth
+
+        var totalDue = 0
+
+        while (!month.isAfter(now)) {
+
+            val monthName =
+                month.format(
+                    DateTimeFormatter.ofPattern(
+                        "MMMM yyyy",
+                        Locale.ENGLISH
+                    )
+                )
+
+            val paid =
+                studentPayments
+                    .filter {
+                        it.month.equals(
+                            monthName,
+                            ignoreCase = true
+                        )
+                    }
+                    .sumOf {
+                        it.amount
+                    }
+
+            totalDue +=
+                maxOf(
+                    0,
+                    student.monthlyFee - paid
+                )
+
+            month =
+                month.plusMonths(1)
+        }
+
+        return totalDue
+    }
+
+    val totalOutstanding =
+        students.sumOf {
+            studentOutstanding(it)
+        }
+
+    val paidStudents =
+        students.count { student ->
+
+            val paid =
+                payments
+                    .filter {
+                        it.studentId == student.id &&
+                        it.month == thisMonth
+                    }
+                    .sumOf {
+                        it.amount
+                    }
+
+            paid >= student.monthlyFee
+        }
+
+    val unpaidStudents =
+        students.size - paidStudents
+
+    val batches =
+        listOf("All") +
+                students
+                    .map { it.batch }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .sorted()
+
+    val visibleStudents =
+        students
+            .filter {
+
+                it.name.contains(
+                    search,
+                    ignoreCase = true
+                ) ||
+
+                it.className.contains(
+                    search,
+                    ignoreCase = true
+                ) ||
+
+                it.batch.contains(
+                    search,
+                    ignoreCase = true
+                ) ||
+
+                it.phone.contains(
+                    search,
+                    ignoreCase = true
+                )
+            }
+            .filter {
+
+                selectedBatch == "All" ||
+                        it.batch == selectedBatch
+            }
+            .sortedBy {
+                it.name.lowercase()
+            }
+
     MaterialTheme {
+
         Scaffold(
+
             topBar = {
+
                 CenterAlignedTopAppBar(
+
                     title = {
+
                         Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            horizontalAlignment =
+                                Alignment.CenterHorizontally
                         ) {
+
                             Text(
                                 "The Math Guild",
-                                fontWeight = FontWeight.Bold
+                                fontWeight =
+                                    FontWeight.Bold
                             )
+
                             Text(
                                 "My Tuition Manager",
-                                style = MaterialTheme.typography.labelSmall
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .labelSmall
                             )
                         }
                     }
                 )
             },
+
             floatingActionButton = {
+
                 FloatingActionButton(
-                    onClick = { addOpen = true }
+                    onClick = {
+                        addOpen = true
+                    }
                 ) {
-                    Text("+")
+
+                    Text(
+                        "+",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .headlineSmall
+                    )
                 }
             }
-        ) { pad ->
+
+        ) { padding ->
 
             LazyColumn(
-                Modifier
-                    .fillMaxSize()
-                    .padding(pad)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(16.dp),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(12.dp)
             ) {
 
+                /* -----------------------------------------
+                   DASHBOARD
+                ----------------------------------------- */
+
                 item {
+
                     Text(
                         "Dashboard",
-                        style = MaterialTheme.typography.headlineSmall
+                        style =
+                            MaterialTheme
+                                .typography
+                                .headlineSmall
                     )
 
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(
+                        Modifier.height(8.dp)
+                    )
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
                     ) {
+
                         SummaryCard(
                             "Students",
                             students.size.toString(),
@@ -330,195 +935,641 @@ fun TuitionApp(store: LocalStore) {
 
                         SummaryCard(
                             "Collected",
-                            "₹$currentPaid",
+                            money(currentPaid),
                             Modifier.weight(1f)
                         )
 
                         SummaryCard(
-                            "Due",
-                            "₹$currentDue",
+                            "Outstanding",
+                            money(totalOutstanding),
                             Modifier.weight(1f)
                         )
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(
+                        Modifier.height(8.dp)
+                    )
 
-                    Text(
-                        "Students",
-                        style = MaterialTheme.typography.titleLarge
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+
+                        SummaryCard(
+                            "Paid",
+                            paidStudents.toString(),
+                            Modifier.weight(1f)
+                        )
+
+                        SummaryCard(
+                            "Unpaid",
+                            unpaidStudents.toString(),
+                            Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                /* -----------------------------------------
+                   SEARCH
+                ----------------------------------------- */
+
+                item {
+
+                    OutlinedTextField(
+
+                        value = search,
+
+                        onValueChange = {
+                            search = it
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth(),
+
+                        label = {
+                            Text(
+                                "Search student"
+                            )
+                        },
+
+                        singleLine = true
                     )
                 }
 
-                items(students) { s ->
+                /* -----------------------------------------
+                   BATCH FILTER
+                ----------------------------------------- */
 
-                    Card(
-                        onClick = { selected = s },
-                        modifier = Modifier.fillMaxWidth()
+                item {
+
+                    Text(
+                        "Batch",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    Row(
+                        horizontalArrangement =
+                            Arrangement.spacedBy(6.dp)
                     ) {
-                        Column(
-                            Modifier.padding(16.dp)
-                        ) {
-                            Text(
-                                s.name,
-                                fontWeight = FontWeight.Bold
+
+                        batches.take(5).forEach {
+                            batch ->
+
+                            FilterChip(
+
+                                selected =
+                                    selectedBatch ==
+                                            batch,
+
+                                onClick = {
+                                    selectedBatch =
+                                        batch
+                                },
+
+                                label = {
+                                    Text(batch)
+                                }
                             )
-
-                            Text("${s.className} • ${s.batch}")
-
-                            Text(
-                                "Monthly fee: ₹${s.monthlyFee}"
-                            )
-
-                            Button(
-                                onClick = { collectOpen = s }
-                            ) {
-                                Text("Collect Fee")
-                            }
                         }
                     }
                 }
 
                 item {
-                    Spacer(Modifier.height(12.dp))
+
+                    Text(
+                        "Students",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleLarge
+                    )
+                }
+
+                /* -----------------------------------------
+                   STUDENT LIST
+                ----------------------------------------- */
+
+                items(
+                    visibleStudents,
+                    key = {
+                        it.id
+                    }
+                ) { student ->
+
+                    val monthlyPaid =
+                        payments
+                            .filter {
+                                it.studentId ==
+                                        student.id &&
+                                        it.month ==
+                                        thisMonth
+                            }
+                            .sumOf {
+                                it.amount
+                            }
+
+                    val monthlyDue =
+                        maxOf(
+                            0,
+                            student.monthlyFee -
+                                    monthlyPaid
+                        )
+
+                    Card(
+                        onClick = {
+                            selectedStudent =
+                                student
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Column(
+                            Modifier.padding(16.dp)
+                        ) {
+
+                            Row(
+                                modifier =
+                                    Modifier.fillMaxWidth(),
+                                horizontalArrangement =
+                                    Arrangement.SpaceBetween
+                            ) {
+
+                                Text(
+                                    student.name,
+                                    fontWeight =
+                                        FontWeight.Bold,
+                                    style =
+                                        MaterialTheme
+                                            .typography
+                                            .titleMedium
+                                )
+
+                                if (monthlyDue == 0) {
+
+                                    Text(
+                                        "PAID",
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+
+                                } else {
+
+                                    Text(
+                                        "DUE ₹$monthlyDue",
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Text(
+                                "${student.className} • ${student.batch}"
+                            )
+
+                            Text(
+                                "Monthly fee: ₹${student.monthlyFee}"
+                            )
+
+                            if (student.phone.isNotBlank()) {
+
+                                Text(
+                                    "Phone: ${student.phone}"
+                                )
+                            }
+
+                            Spacer(
+                                Modifier.height(8.dp)
+                            )
+
+                            Row(
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(8.dp)
+                            ) {
+
+                                Button(
+                                    onClick = {
+                                        collectStudent =
+                                            student
+                                    }
+                                ) {
+                                    Text(
+                                        "Collect Fee"
+                                    )
+                                }
+
+                                OutlinedButton(
+                                    onClick = {
+                                        editStudent =
+                                            student
+                                    }
+                                ) {
+                                    Text("Edit")
+                                }
+                            }
+                        }
+                    }
+                }
+
+                /* -----------------------------------------
+                   REPORTS
+                ----------------------------------------- */
+
+                item {
+
+                    Spacer(
+                        Modifier.height(8.dp)
+                    )
+
+                    Button(
+                        onClick = {
+                            reportOpen = true
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            "Reports"
+                        )
+                    }
+                }
+
+                /* -----------------------------------------
+                   BACKUP
+                ----------------------------------------- */
+
+                item {
 
                     Text(
                         "Backup & Restore",
-                        style = MaterialTheme.typography.titleLarge
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleLarge
                     )
 
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement =
+                            Arrangement.spacedBy(8.dp)
                     ) {
 
                         Button(
                             onClick = {
-                                val uri = exportBackup(context)
-                                shareReceipt(context, uri)
+
+                                val uri =
+                                    exportBackup(
+                                        context
+                                    )
+
+                                shareReceipt(
+                                    context,
+                                    uri
+                                )
                             }
                         ) {
-                            Text("Backup")
+
+                            Text(
+                                "Backup"
+                            )
                         }
 
                         OutlinedButton(
+
                             onClick = {
-                                (context as? MainActivity)?.pickBackup { ok ->
-                                    android.widget.Toast.makeText(
+
+                                (
+                                    context as?
+                                            MainActivity
+                                )?.pickBackup { ok ->
+
+                                    Toast.makeText(
+
                                         context,
+
                                         if (ok)
-                                            "Backup restored. Restart the app to refresh."
+                                            "Backup restored. Please restart the app."
                                         else
                                             "Restore failed.",
-                                        android.widget.Toast.LENGTH_LONG
+
+                                        Toast.LENGTH_LONG
+
                                     ).show()
                                 }
                             }
+
                         ) {
-                            Text("Restore")
+
+                            Text(
+                                "Restore"
+                            )
                         }
                     }
                 }
             }
         }
 
+        /* =================================================
+           ADD STUDENT
+        ================================================= */
+
         if (addOpen) {
-            AddStudentDialog(
-                onDismiss = { addOpen = false },
-                onAdd = {
-                    students = students + it
-                    store.saveStudents(students)
+
+            StudentEditorDialog(
+
+                title = "Add Student",
+
+                initialStudent = null,
+
+                onDismiss = {
+                    addOpen = false
+                },
+
+                onSave = { student ->
+
+                    students =
+                        students + student
+
+                    store.saveStudents(
+                        students
+                    )
+
                     addOpen = false
                 }
             )
         }
 
-        selected?.let { s ->
-            StudentDialog(
-                student = s,
-                payments = payments.filter { it.studentId == s.id },
-                onDismiss = { selected = null },
-                onCollect = {
-                    collectOpen = s
-                    selected = null
+        /* =================================================
+           EDIT STUDENT
+        ================================================= */
+
+        editStudent?.let { student ->
+
+            StudentEditorDialog(
+
+                title = "Edit Student",
+
+                initialStudent = student,
+
+                onDismiss = {
+                    editStudent = null
+                },
+
+                onSave = { updated ->
+
+                    students =
+                        students.map {
+
+                            if (
+                                it.id ==
+                                    updated.id
+                            ) {
+                                updated
+                            } else {
+                                it
+                            }
+                        }
+
+                    store.saveStudents(
+                        students
+                    )
+
+                    editStudent = null
                 }
             )
         }
 
-        collectOpen?.let { s ->
-            CollectFeeDialog(
-                student = s,
-                onDismiss = { collectOpen = null },
-                onSave = { month, amount ->
+        /* =================================================
+           STUDENT DETAILS
+        ================================================= */
 
-                    val payment = Payment(
-                        s.id,
-                        month,
-                        amount,
-                        SimpleDateFormat(
-                            "dd/MM/yyyy",
-                            Locale.getDefault()
-                        ).format(Date())
+        selectedStudent?.let { student ->
+
+            StudentDetailsDialog(
+
+                student = student,
+
+                payments =
+                    payments.filter {
+                        it.studentId ==
+                                student.id
+                    },
+
+                outstanding =
+                    studentOutstanding(
+                        student
+                    ),
+
+                onDismiss = {
+                    selectedStudent = null
+                },
+
+                onCollect = {
+
+                    collectStudent =
+                        student
+
+                    selectedStudent =
+                        null
+                },
+
+                onEdit = {
+
+                    editStudent =
+                        student
+
+                    selectedStudent =
+                        null
+                },
+
+                onDelete = {
+
+                    students =
+                        students.filter {
+                            it.id !=
+                                    student.id
+                        }
+
+                    payments =
+                        payments.filter {
+                            it.studentId !=
+                                    student.id
+                        }
+
+                    store.saveStudents(
+                        students
                     )
 
-                    payments = payments + payment
-                    store.savePayments(payments)
+                    store.savePayments(
+                        payments
+                    )
+
+                    selectedStudent = null
+                }
+            )
+        }
+
+        /* =================================================
+           COLLECT FEE
+        ================================================= */
+
+        collectStudent?.let { student ->
+
+            CollectFeeDialog(
+
+                student = student,
+
+                onDismiss = {
+                    collectStudent = null
+                },
+
+                onSave = { month, amount ->
+
+                    val payment =
+                        Payment(
+
+                            student.id,
+
+                            month,
+
+                            amount,
+
+                            SimpleDateFormat(
+                                "dd/MM/yyyy",
+                                Locale.getDefault()
+                            ).format(
+                                Date()
+                            )
+                        )
+
+                    payments =
+                        payments + payment
+
+                    store.savePayments(
+                        payments
+                    )
 
                     val receiptNo =
                         "TMG-" +
-                        SimpleDateFormat(
-                            "yyyy",
-                            Locale.getDefault()
-                        ).format(Date()) +
-                        "-" +
-                        payments.size.toString().padStart(5, '0')
+                                SimpleDateFormat(
+                                    "yyyy",
+                                    Locale.getDefault()
+                                ).format(
+                                    Date()
+                                ) +
+                                "-" +
+                                payments.size
+                                    .toString()
+                                    .padStart(
+                                        5,
+                                        '0'
+                                    )
 
-                    lastReceiptUri =
+                    receiptUri =
                         createReceiptPdf(
                             context,
-                            s,
+                            student,
                             payment,
                             receiptNo
                         )
 
-                    collectOpen = null
+                    collectStudent = null
                 }
             )
         }
 
-        lastReceiptUri?.let { uri ->
+        /* =================================================
+           RECEIPT DIALOG
+        ================================================= */
+
+        receiptUri?.let { uri ->
 
             AlertDialog(
+
                 onDismissRequest = {
-                    lastReceiptUri = null
+                    receiptUri = null
                 },
+
                 title = {
-                    Text("Payment Saved")
+                    Text(
+                        "Payment Saved ✓"
+                    )
                 },
+
                 text = {
-                    Text("Your PDF receipt has been created.")
+                    Text(
+                        "Your professional PDF receipt has been created."
+                    )
                 },
+
                 confirmButton = {
+
                     Button(
                         onClick = {
-                            shareReceipt(context, uri)
-                            lastReceiptUri = null
+
+                            shareReceiptWhatsApp(
+                                context,
+                                uri
+                            )
+
+                            receiptUri = null
                         }
                     ) {
-                        Text("Share Receipt")
+
+                        Text(
+                            "WhatsApp"
+                        )
                     }
                 },
+
                 dismissButton = {
+
                     TextButton(
                         onClick = {
-                            lastReceiptUri = null
+
+                            shareReceipt(
+                                context,
+                                uri
+                            )
+
+                            receiptUri = null
                         }
                     ) {
-                        Text("Close")
+
+                        Text(
+                            "Other Share"
+                        )
                     }
+                }
+            )
+        }
+
+        /* =================================================
+           REPORTS
+        ================================================= */
+
+        if (reportOpen) {
+
+            ReportsDialog(
+
+                students = students,
+
+                payments = payments,
+
+                onDismiss = {
+                    reportOpen = false
                 }
             )
         }
     }
 }
+
+/* =========================================================
+   SUMMARY CARD
+========================================================= */
 
 @Composable
 fun SummaryCard(
@@ -526,165 +1577,432 @@ fun SummaryCard(
     value: String,
     modifier: Modifier
 ) {
-    Card(modifier) {
+
+    Card(
+        modifier = modifier
+    ) {
+
         Column(
             Modifier.padding(12.dp)
         ) {
+
             Text(
                 title,
-                style = MaterialTheme.typography.labelSmall
+                style =
+                    MaterialTheme
+                        .typography
+                        .labelSmall
             )
 
             Text(
                 value,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                style =
+                    MaterialTheme
+                        .typography
+                        .titleMedium,
+                fontWeight =
+                    FontWeight.Bold
             )
         }
     }
 }
 
+/* =========================================================
+   STUDENT EDITOR
+========================================================= */
+
 @Composable
-fun AddStudentDialog(
+fun StudentEditorDialog(
+    title: String,
+    initialStudent: Student?,
     onDismiss: () -> Unit,
-    onAdd: (Student) -> Unit
+    onSave: (Student) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var cls by remember { mutableStateOf("") }
-    var batch by remember { mutableStateOf("") }
-    var fee by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
+
+    var name by remember {
+        mutableStateOf(
+            initialStudent?.name ?: ""
+        )
+    }
+
+    var cls by remember {
+        mutableStateOf(
+            initialStudent?.className ?: ""
+        )
+    }
+
+    var batch by remember {
+        mutableStateOf(
+            initialStudent?.batch ?: ""
+        )
+    }
+
+    var fee by remember {
+        mutableStateOf(
+            initialStudent?.monthlyFee
+                ?.toString() ?: ""
+        )
+    }
+
+    var phone by remember {
+        mutableStateOf(
+            initialStudent?.phone ?: ""
+        )
+    }
 
     AlertDialog(
+
         onDismissRequest = onDismiss,
 
         title = {
-            Text("Add Student")
+            Text(title)
         },
 
         text = {
+
             Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
+
                 OutlinedTextField(
-                    name,
-                    { name = it },
-                    label = { Text("Student name") }
+                    value = name,
+                    onValueChange = {
+                        name = it
+                    },
+                    label = {
+                        Text(
+                            "Student name"
+                        )
+                    },
+                    singleLine = true
                 )
 
                 OutlinedTextField(
-                    cls,
-                    { cls = it },
-                    label = { Text("Class") }
+                    value = cls,
+                    onValueChange = {
+                        cls = it
+                    },
+                    label = {
+                        Text("Class")
+                    },
+                    singleLine = true
                 )
 
                 OutlinedTextField(
-                    batch,
-                    { batch = it },
-                    label = { Text("Batch") }
+                    value = batch,
+                    onValueChange = {
+                        batch = it
+                    },
+                    label = {
+                        Text("Batch")
+                    },
+                    singleLine = true
                 )
 
                 OutlinedTextField(
-                    fee,
-                    { fee = it },
-                    label = { Text("Monthly fee") }
+                    value = fee,
+                    onValueChange = {
+                        fee = it
+                    },
+                    label = {
+                        Text(
+                            "Monthly fee"
+                        )
+                    },
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType =
+                                KeyboardType.Number
+                        ),
+                    singleLine = true
                 )
 
                 OutlinedTextField(
-                    phone,
-                    { phone = it },
-                    label = { Text("Phone (optional)") }
+                    value = phone,
+                    onValueChange = {
+                        phone = it
+                    },
+                    label = {
+                        Text(
+                            "Phone"
+                        )
+                    },
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType =
+                                KeyboardType.Phone
+                        ),
+                    singleLine = true
                 )
             }
         },
 
         confirmButton = {
+
             Button(
+
                 enabled =
                     name.isNotBlank() &&
-                    fee.toIntOrNull() != null,
+                            fee.toIntOrNull()
+                                != null,
 
                 onClick = {
-                    onAdd(
+
+                    val id =
+                        initialStudent?.id
+                            ?: System
+                                .currentTimeMillis()
+
+                    onSave(
+
                         Student(
-                            System.currentTimeMillis(),
-                            name,
-                            cls,
-                            batch,
+                            id,
+                            name.trim(),
+                            cls.trim(),
+                            batch.trim(),
                             fee.toInt(),
-                            phone
+                            phone.trim()
                         )
                     )
                 }
+
             ) {
-                Text("Save")
+
+                Text(
+                    "Save"
+                )
             }
         },
 
         dismissButton = {
+
             TextButton(
                 onClick = onDismiss
             ) {
-                Text("Cancel")
+
+                Text(
+                    "Cancel"
+                )
             }
         }
     )
 }
 
+/* =========================================================
+   STUDENT DETAILS
+========================================================= */
+
 @Composable
-fun StudentDialog(
+fun StudentDetailsDialog(
     student: Student,
     payments: List<Payment>,
+    outstanding: Int,
     onDismiss: () -> Unit,
-    onCollect: () -> Unit
+    onCollect: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
 ) {
+
+    var deleteConfirm by remember {
+        mutableStateOf(false)
+    }
+
     AlertDialog(
+
         onDismissRequest = onDismiss,
 
         title = {
-            Text(student.name)
+            Text(
+                student.name,
+                fontWeight =
+                    FontWeight.Bold
+            )
         },
 
         text = {
+
             Column(
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(7.dp)
             ) {
-                Text("${student.className} • ${student.batch}")
+
+                Text(
+                    "${student.className} • ${student.batch}"
+                )
 
                 Text(
                     "Monthly fee: ₹${student.monthlyFee}"
                 )
 
+                if (student.phone.isNotBlank()) {
+
+                    Text(
+                        "Phone: ${student.phone}"
+                    )
+                }
+
+                HorizontalDivider()
+
                 Text(
-                    "Payment history",
-                    fontWeight = FontWeight.Bold
+                    "Total Outstanding: ₹$outstanding",
+                    fontWeight =
+                        FontWeight.Bold
+                )
+
+                Text(
+                    "Payment History",
+                    fontWeight =
+                        FontWeight.Bold
                 )
 
                 if (payments.isEmpty()) {
-                    Text("No payments recorded.")
-                }
 
-                payments.reversed().forEach {
                     Text(
-                        "${it.month}: ₹${it.amount} • ${it.date}"
+                        "No payments recorded."
                     )
+
+                } else {
+
+                    payments
+                        .reversed()
+                        .forEach { payment ->
+
+                            Card {
+
+                                Column(
+                                    Modifier.padding(
+                                        10.dp
+                                    )
+                                ) {
+
+                                    Text(
+                                        payment.month,
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+
+                                    Text(
+                                        "Paid: ₹${payment.amount}"
+                                    )
+
+                                    Text(
+                                        "Date: ${payment.date}"
+                                    )
+                                }
+                            }
+                        }
                 }
             }
         },
 
         confirmButton = {
-            Button(onClick = onCollect) {
-                Text("Collect Fee")
+
+            Button(
+                onClick = onCollect
+            ) {
+
+                Text(
+                    "Collect Fee"
+                )
             }
         },
 
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+
+            Row {
+
+                TextButton(
+                    onClick = onEdit
+                ) {
+
+                    Text(
+                        "Edit"
+                    )
+                }
+
+                TextButton(
+                    onClick = {
+                        deleteConfirm = true
+                    }
+                ) {
+
+                    Text(
+                        "Delete"
+                    )
+                }
             }
         }
     )
+
+    if (deleteConfirm) {
+
+        AlertDialog(
+
+            onDismissRequest = {
+                deleteConfirm = false
+            },
+
+            title = {
+                Text(
+                    "Delete Student?"
+                )
+            },
+
+            text = {
+                Text(
+                    "This will delete the student and all payment history. This cannot be undone."
+                )
+            },
+
+            confirmButton = {
+
+                Button(
+
+                    onClick = {
+
+                        deleteConfirm = false
+                        onDelete()
+                    }
+
+                ) {
+
+                    Text(
+                        "Delete"
+                    )
+                }
+            },
+
+            dismissButton = {
+
+                TextButton(
+                    onClick = {
+                        deleteConfirm = false
+                    }
+                ) {
+
+                    Text(
+                        "Cancel"
+                    )
+                }
+            }
+        )
+    }
 }
+
+/* =========================================================
+   COLLECT FEE
+========================================================= */
 
 @Composable
 fun CollectFeeDialog(
@@ -692,71 +2010,433 @@ fun CollectFeeDialog(
     onDismiss: () -> Unit,
     onSave: (String, Int) -> Unit
 ) {
+
     val defaultMonth =
-        SimpleDateFormat(
-            "MMMM yyyy",
-            Locale.getDefault()
-        ).format(Date())
+        currentMonth()
 
     var month by remember {
-        mutableStateOf(defaultMonth)
+        mutableStateOf(
+            defaultMonth
+        )
     }
 
     var amount by remember {
-        mutableStateOf(student.monthlyFee.toString())
+        mutableStateOf(
+            student.monthlyFee
+                .toString()
+        )
     }
 
     AlertDialog(
+
         onDismissRequest = onDismiss,
 
         title = {
-            Text("Collect Fee — ${student.name}")
+            Text(
+                "Collect Fee"
+            )
         },
 
         text = {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedTextField(
-                    month,
-                    { month = it },
-                    label = { Text("Fee month") }
-                )
 
-                OutlinedTextField(
-                    amount,
-                    { amount = it },
-                    label = { Text("Amount paid") }
+            Column(
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+
+                Text(
+                    student.name,
+                    fontWeight =
+                        FontWeight.Bold
                 )
 
                 Text(
                     "Monthly fee: ₹${student.monthlyFee}"
                 )
+
+                OutlinedTextField(
+
+                    value = month,
+
+                    onValueChange = {
+                        month = it
+                    },
+
+                    label = {
+                        Text(
+                            "Fee month"
+                        )
+                    },
+
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+
+                    value = amount,
+
+                    onValueChange = {
+                        amount = it
+                    },
+
+                    label = {
+                        Text(
+                            "Amount paid"
+                        )
+                    },
+
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType =
+                                KeyboardType.Number
+                        ),
+
+                    singleLine = true
+                )
+
+                Text(
+                    "Partial payment is allowed."
+                )
             }
         },
 
         confirmButton = {
+
             Button(
+
                 enabled =
                     month.isNotBlank() &&
-                    amount.toIntOrNull() != null,
+                            amount.toIntOrNull()
+                                != null &&
+                            amount.toInt() > 0,
 
                 onClick = {
+
                     onSave(
-                        month,
+                        month.trim(),
                         amount.toInt()
                     )
                 }
+
             ) {
-                Text("Save Payment")
+
+                Text(
+                    "Save Payment"
+                )
             }
         },
 
         dismissButton = {
+
             TextButton(
                 onClick = onDismiss
             ) {
-                Text("Cancel")
+
+                Text(
+                    "Cancel"
+                )
+            }
+        }
+    )
+}
+
+/* =========================================================
+   REPORTS
+========================================================= */
+
+@Composable
+fun ReportsDialog(
+    students: List<Student>,
+    payments: List<Payment>,
+    onDismiss: () -> Unit
+) {
+
+    var selectedReport by remember {
+        mutableStateOf(
+            "Monthly"
+        )
+    }
+
+    val months =
+        payments
+            .map {
+                it.month
+            }
+            .distinct()
+            .sortedDescending()
+
+    val selectedMonth =
+        months.firstOrNull()
+            ?: currentMonth()
+
+    AlertDialog(
+
+        onDismissRequest = onDismiss,
+
+        title = {
+            Text(
+                "Reports",
+                fontWeight =
+                    FontWeight.Bold
+            )
+        },
+
+        text = {
+
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(10.dp)
+            ) {
+
+                Row(
+                    horizontalArrangement =
+                        Arrangement.spacedBy(5.dp)
+                ) {
+
+                    FilterChip(
+                        selected =
+                            selectedReport ==
+                                    "Monthly",
+
+                        onClick = {
+                            selectedReport =
+                                "Monthly"
+                        },
+
+                        label = {
+                            Text(
+                                "Monthly"
+                            )
+                        }
+                    )
+
+                    FilterChip(
+                        selected =
+                            selectedReport ==
+                                    "Batch",
+
+                        onClick = {
+                            selectedReport =
+                                "Batch"
+                        },
+
+                        label = {
+                            Text(
+                                "Batch"
+                            )
+                        }
+                    )
+
+                    FilterChip(
+                        selected =
+                            selectedReport ==
+                                    "Students",
+
+                        onClick = {
+                            selectedReport =
+                                "Students"
+                        },
+
+                        label = {
+                            Text(
+                                "Students"
+                            )
+                        }
+                    )
+                }
+
+                HorizontalDivider()
+
+                if (selectedReport ==
+                    "Monthly"
+                ) {
+
+                    Text(
+                        "Monthly Collection",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    if (months.isEmpty()) {
+
+                        Text(
+                            "No payments recorded."
+                        )
+
+                    } else {
+
+                        months.forEach { month ->
+
+                            val total =
+                                payments
+                                    .filter {
+                                        it.month ==
+                                                month
+                                    }
+                                    .sumOf {
+                                        it.amount
+                                    }
+
+                            Card {
+
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            12.dp
+                                        ),
+                                    horizontalArrangement =
+                                        Arrangement
+                                            .SpaceBetween
+                                ) {
+
+                                    Text(
+                                        month
+                                    )
+
+                                    Text(
+                                        "₹$total",
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                } else if (
+                    selectedReport ==
+                    "Batch"
+                ) {
+
+                    Text(
+                        "Batch-wise Collection",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    val batches =
+                        students
+                            .map {
+                                it.batch
+                            }
+                            .filter {
+                                it.isNotBlank()
+                            }
+                            .distinct()
+                            .sorted()
+
+                    batches.forEach { batch ->
+
+                        val ids =
+                            students
+                                .filter {
+                                    it.batch ==
+                                            batch
+                                }
+                                .map {
+                                    it.id
+                                }
+
+                        val total =
+                            payments
+                                .filter {
+                                    it.studentId
+                                            in ids
+                                }
+                                .sumOf {
+                                    it.amount
+                                }
+
+                        Card {
+
+                            Column(
+                                Modifier.padding(
+                                    12.dp
+                                )
+                            ) {
+
+                                Text(
+                                    "Batch $batch",
+                                    fontWeight =
+                                        FontWeight.Bold
+                                )
+
+                                Text(
+                                    "Collected: ₹$total"
+                                )
+                            }
+                        }
+                    }
+
+                } else {
+
+                    Text(
+                        "Student Payment History",
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                    students
+                        .sortedBy {
+                            it.name
+                        }
+                        .forEach { student ->
+
+                            val total =
+                                payments
+                                    .filter {
+                                        it.studentId ==
+                                                student.id
+                                    }
+                                    .sumOf {
+                                        it.amount
+                                    }
+
+                            Card {
+
+                                Column(
+                                    Modifier.padding(
+                                        12.dp
+                                    )
+                                ) {
+
+                                    Text(
+                                        student.name,
+                                        fontWeight =
+                                            FontWeight.Bold
+                                    )
+
+                                    Text(
+                                        "${student.className} • ${student.batch}"
+                                    )
+
+                                    Text(
+                                        "Total paid: ₹$total"
+                                    )
+                                }
+                            }
+                        }
+                }
+            }
+        },
+
+        confirmButton = {
+
+            TextButton(
+                onClick = onDismiss
+            ) {
+
+                Text(
+                    "Close"
+                )
             }
         }
     )
