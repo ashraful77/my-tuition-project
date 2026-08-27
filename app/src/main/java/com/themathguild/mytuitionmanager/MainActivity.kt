@@ -1847,53 +1847,356 @@ if (cls == "Others") {
                             keyboardType =
                                 KeyboardType.Number
                         ),
-                    singleLine = true
-                )
+/* =========================================================
+   STUDENT EDITOR
+========================================================= */
+
+@Composable
+fun StudentEditorDialog(
+    title: String,
+    initialStudent: Student?,
+    onDismiss: () -> Unit,
+    onSave: (Student) -> Unit
+) {
+
+    val standardClasses =
+        listOf(
+            "V",
+            "VI",
+            "VII",
+            "VIII",
+            "IX",
+            "X"
+        )
+
+    val existingClass =
+        initialStudent?.className ?: ""
+
+    var cls by remember {
+        mutableStateOf(
+            if (
+                existingClass.isBlank() ||
+                existingClass in standardClasses
+            ) {
+                existingClass
+            } else {
+                "Others"
+            }
+        )
+    }
+
+    var clsOther by remember {
+        mutableStateOf(
+            if (
+                existingClass.isNotBlank() &&
+                existingClass !in standardClasses
+            ) {
+                existingClass
+            } else {
+                ""
+            }
+        )
+    }
+
+    var classMenuOpen by remember {
+        mutableStateOf(false)
+    }
+
+    var name by remember {
+        mutableStateOf(
+            initialStudent?.name ?: ""
+        )
+    }
+
+    var batch by remember {
+        mutableStateOf(
+            initialStudent?.batch ?: ""
+        )
+    }
+
+    var fee by remember {
+        mutableStateOf(
+            initialStudent?.monthlyFee
+                ?.toString() ?: ""
+        )
+    }
+
+    var phone by remember {
+        mutableStateOf(
+            initialStudent?.phone ?: ""
+        )
+    }
+
+    AlertDialog(
+
+        onDismissRequest = onDismiss,
+
+        title = {
+            Text(title)
+        },
+
+        text = {
+
+            Column(
+
+                modifier =
+                    Modifier.verticalScroll(
+                        rememberScrollState()
+                    ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(8.dp)
+            ) {
+
+                /* -----------------------------------------
+                   STUDENT NAME
+                ----------------------------------------- */
 
                 OutlinedTextField(
+
+                    value = name,
+
+                    onValueChange = {
+                        name = it
+                    },
+
+                    label = {
+                        Text("Student name")
+                    },
+
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                /* -----------------------------------------
+                   CLASS
+                ----------------------------------------- */
+
+                Box(
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+
+                    OutlinedButton(
+
+                        onClick = {
+                            classMenuOpen = true
+                        },
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+
+                        Text(
+                            if (cls.isBlank())
+                                "Select Class"
+                            else
+                                cls
+                        )
+                    }
+
+                    DropdownMenu(
+
+                        expanded =
+                            classMenuOpen,
+
+                        onDismissRequest = {
+                            classMenuOpen = false
+                        }
+                    ) {
+
+                        standardClasses.forEach {
+                            className ->
+
+                            DropdownMenuItem(
+
+                                text = {
+                                    Text(className)
+                                },
+
+                                onClick = {
+
+                                    cls =
+                                        className
+
+                                    classMenuOpen =
+                                        false
+                                }
+                            )
+                        }
+
+                        DropdownMenuItem(
+
+                            text = {
+                                Text("Others")
+                            },
+
+                            onClick = {
+
+                                cls =
+                                    "Others"
+
+                                classMenuOpen =
+                                    false
+                            }
+                        )
+                    }
+                }
+
+                /* -----------------------------------------
+                   OTHER CLASS
+                ----------------------------------------- */
+
+                if (cls == "Others") {
+
+                    OutlinedTextField(
+
+                        value = clsOther,
+
+                        onValueChange = {
+                            clsOther = it
+                        },
+
+                        label = {
+                            Text("Enter class")
+                        },
+
+                        placeholder = {
+                            Text(
+                                "e.g. XI, XII, JEE"
+                            )
+                        },
+
+                        singleLine = true,
+
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+                }
+
+                /* -----------------------------------------
+                   BATCH
+                ----------------------------------------- */
+
+                OutlinedTextField(
+
+                    value = batch,
+
+                    onValueChange = {
+                        batch = it
+                    },
+
+                    label = {
+                        Text("Batch")
+                    },
+
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                /* -----------------------------------------
+                   MONTHLY FEE
+                ----------------------------------------- */
+
+                OutlinedTextField(
+
+                    value = fee,
+
+                    onValueChange = {
+                        fee = it
+                    },
+
+                    label = {
+                        Text("Monthly fee")
+                    },
+
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType =
+                                KeyboardType.Number
+                        ),
+
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                )
+
+                /* -----------------------------------------
+                   PHONE
+                ----------------------------------------- */
+
+                OutlinedTextField(
+
                     value = phone,
+
                     onValueChange = {
                         phone = it
                     },
+
                     label = {
-                        Text(
-                            "Phone"
-                        )
+                        Text("Phone")
                     },
+
                     keyboardOptions =
                         KeyboardOptions(
                             keyboardType =
                                 KeyboardType.Phone
                         ),
-                    singleLine = true
+
+                    singleLine = true,
+
+                    modifier =
+                        Modifier.fillMaxWidth()
                 )
             }
         },
 
+        /* ---------------------------------------------
+           SAVE
+        --------------------------------------------- */
+
         confirmButton = {
+
+            val finalClass =
+                if (cls == "Others") {
+                    clsOther.trim()
+                } else {
+                    cls.trim()
+                }
 
             Button(
 
                 enabled =
                     name.isNotBlank() &&
                             fee.toIntOrNull()
-                                != null,
+                                != null &&
+                            finalClass.isNotBlank(),
 
                 onClick = {
 
                     val id =
                         initialStudent?.id
-                            ?: System
-                                .currentTimeMillis()
+                            ?: System.currentTimeMillis()
 
                     onSave(
 
                         Student(
+
                             id,
+
                             name.trim(),
-                            cls.trim(),
+
+                            finalClass,
+
                             batch.trim(),
+
                             fee.toInt(),
+
                             phone.trim()
                         )
                     )
@@ -1901,9 +2204,7 @@ if (cls == "Others") {
 
             ) {
 
-                Text(
-                    "Save"
-                )
+                Text("Save")
             }
         },
 
@@ -1913,9 +2214,7 @@ if (cls == "Others") {
                 onClick = onDismiss
             ) {
 
-                Text(
-                    "Cancel"
-                )
+                Text("Cancel")
             }
         }
     )
