@@ -4,9 +4,9 @@
 
     <application
         android:theme="@style/Theme.MyTuitionManager"
-        android:label="The Math Guide"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="The Math Guild"
+        android:icon="@drawable/app_logo"
+        android:roundIcon="@drawable/app_logo"
         android:allowBackup="true"
         android:supportsRtl="true">
 
