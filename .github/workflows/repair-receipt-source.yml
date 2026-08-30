@@ -1,0 +1,34 @@
+name: Repair receipt source
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: github.event.head_commit.message != 'Repair receipt source formatting'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Repair escaped newlines
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt')
+          s = p.read_text()
+          before = s.count('\\\\n')
+          s = s.replace('\\\\n', '\n')
+          p.write_text(s)
+          print(f'Repaired {before} literal escaped-newline sequences.')
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair receipt source formatting"
+          git push origin HEAD:main
