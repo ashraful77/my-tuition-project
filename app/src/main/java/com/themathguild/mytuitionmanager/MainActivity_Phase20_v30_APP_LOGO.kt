@@ -327,7 +327,184 @@ fun validateFeeCollection(
     return null
 }
 
-fun createReceiptPdf(\n    context: Context,\n    student: Student,\n    paymentsForReceipt: List<Payment>,\n    receiptNo: String,\n    profile: TuitionProfile = TuitionProfile()\n): Uri {\n    val doc = PdfDocument()\n    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())\n    val canvas = page.canvas\n    val paint = Paint(Paint.ANTI_ALIAS_FLAG)\n\n    val pageWidth = 595f\n    val left = 42f\n    val right = 553f\n    val navy = Color.rgb(28, 45, 78)\n    val blue = Color.rgb(55, 92, 145)\n    val light = Color.rgb(242, 245, 249)\n    val muted = Color.rgb(90, 100, 115)\n    val green = Color.rgb(35, 125, 75)\n\n    fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, x, y, paint)\n    }\n\n    fun center(value: String, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, (pageWidth - paint.measureText(value)) / 2f, y, paint)\n    }\n\n    fun rounded(top: Float, bottom: Float, color: Int = Color.WHITE, stroke: Int? = null, width: Float = 1f) {\n        paint.style = if (stroke == null) Paint.Style.FILL else Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawRoundRect(left, top, right, bottom, 10f, 10f, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun rule(y: Float, color: Int = Color.LTGRAY, width: Float = 1f) {\n        paint.style = Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawLine(left, y, right, y, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun wrapped(value: String, x: Float, y: Float, maxWidth: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY): Float {\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        paint.color = color\n        val words = value.split(" ")\n        var line = ""\n        var yy = y\n        for (word in words) {\n            val candidate = if (line.isBlank()) word else "$line $word"\n            if (paint.measureText(candidate) > maxWidth && line.isNotBlank()) {\n                text(line, x, yy, size, bold, color)\n                yy += size + 4f\n                line = word\n            } else line = candidate\n        }\n        if (line.isNotBlank()) {\n            text(line, x, yy, size, bold, color)\n            yy += size + 4f\n        }\n        return yy\n    }\n\n    val sortedPayments = paymentsForReceipt.sortedBy { monthKey(it.month) }\n    val totalPaid = sortedPayments.sumOf { it.amount }\n    val totalFee = student.monthlyFee * sortedPayments.size\n    val status = if (totalPaid >= totalFee) "PAID" else "PARTIAL"\n    val date = sortedPayments.firstOrNull()?.date ?: currentDate()\n\n    // Branded header\n    paint.color = navy\n    paint.style = Paint.Style.FILL\n    canvas.drawRoundRect(left, 28f, right, 145f, 14f, 14f, paint)\n\n    try {\n        val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)\n        if (bitmap != null) {\n            val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 64, 64, true)\n            canvas.drawBitmap(scaled, left + 18f, 48f, paint)\n        }\n    } catch (_: Exception) { }\n\n    text(profile.tuitionName.uppercase(), left + 96f, 67f, 21f, true, Color.WHITE)\n    text(profile.tagline, left + 96f, 88f, 10f, false, Color.WHITE)\n    wrapped(profile.address, left + 96f, 107f, 315f, 8f, false, Color.WHITE)\n    text("FEE RECEIPT", 438f, 69f, 10f, true, Color.WHITE)\n    text("OFFICIAL", 462f, 88f, 8f, true, Color.WHITE)\n\n    // Receipt metadata\n    rounded(158f, 213f, light)\n    text("RECEIPT NO.", left + 16f, 178f, 8f, true, muted)\n    text(receiptNo, left + 16f, 198f, 13f, true, navy)\n    text("PAYMENT DATE", 390f, 178f, 8f, true, muted)\n    text(date, 390f, 198f, 13f, true, navy)\n\n    // Student section\n    text("STUDENT DETAILS", left, 239f, 11f, true, navy)\n    rounded(248f, 345f, Color.WHITE, Color.LTGRAY)\n    text("Student Name", left + 16f, 270f, 8f, true, muted)\n    text(student.name, left + 16f, 290f, 14f, true, Color.DKGRAY)\n    text("Class", left + 16f, 317f, 8f, true, muted)\n    text(student.className.ifBlank { "Not provided" }, left + 16f, 334f, 11f, true)\n    text("Batch", 215f, 317f, 8f, true, muted)\n    text(student.batch.ifBlank { "Not provided" }, 215f, 334f, 11f, true)\n    text("Joining Month", 350f, 317f, 8f, true, muted)\n    text(student.joiningMonth.ifBlank { "Not provided" }, 350f, 334f, 11f, true)\n\n    // Payment section\n    text("PAYMENT DETAILS", left, 374f, 11f, true, navy)\n    rounded(384f, 545f, Color.WHITE, Color.LTGRAY)\n    paint.color = light\n    canvas.drawRect(left + 1f, 385f, right - 1f, 414f, paint)\n    text("FEE MONTH(S)", left + 16f, 403f, 8f, true, muted)\n    text("AMOUNT", 465f, 403f, 8f, true, muted)\n\n    var y = 434f\n    val monthsText = sortedPayments.joinToString(", ") { it.month }\n    y = wrapped(monthsText.ifBlank { "—" }, left + 16f, y, 395f, 10f, true)\n    text("₹$totalPaid", 465f, 434f, 12f, true, navy)\n    rule(maxOf(y + 2f, 465f), Color.LTGRAY, 0.8f)\n    text("Months Covered", left + 16f, maxOf(y + 24f, 490f), 9f, false, muted)\n    text(sortedPayments.size.toString(), 465f, maxOf(y + 24f, 490f), 10f, true)\n    text("Monthly Fee", left + 16f, maxOf(y + 47f, 517f), 9f, false, muted)\n    text("₹${student.monthlyFee}", 440f, maxOf(y + 47f, 517f), 10f, true)\n\n    // Total and status\n    rounded(559f, 640f, light)\n    text("TOTAL PAID", left + 16f, 590f, 9f, true, muted)\n    text("₹$totalPaid", left + 16f, 620f, 23f, true, navy)\n    paint.style = Paint.Style.STROKE\n    paint.strokeWidth = 1.5f\n    paint.color = if (status == "PAID") green else blue\n    canvas.drawRoundRect(428f, 578f, 537f, 623f, 10f, 10f, paint)\n    paint.style = Paint.Style.FILL\n    center(if (status == "PAID") "PAID" else "PARTIAL", 607f, 13f, true, if (status == "PAID") green else blue)\n\n    // Footer / signature\n    rule(667f, Color.LTGRAY, 1f)\n    text("Thank you for your payment.", left, 694f, 11f, true, navy)\n    text("Please keep this receipt for your records.", left, 712f, 9f, false, muted)\n\n    text("Authorized by", left, 758f, 8f, true, muted)\n    text(profile.teacherName, left, 778f, 12f, true, Color.DKGRAY)\n    text("${profile.qualification} • ${profile.tuitionName}", left, 795f, 8f, false, muted)\n    rule(806f, Color.DKGRAY, 0.8f)\n    text("Signature", left, 820f, 7f, false, muted)\n\n    text("Contact", 390f, 758f, 8f, true, muted)\n    text(profile.phone, 390f, 778f, 11f, true, Color.DKGRAY)\n    wrapped(profile.address, 390f, 796f, 155f, 7f, false, muted)\n    center("Computer-generated receipt • The Math Guide", 836f, 7f, false, muted)\n\n    doc.finishPage(page)\n    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }\n    val file = File(dir, "$receiptNo.pdf")\n    file.outputStream().use { doc.writeTo(it) }\n    doc.close()\n\n    return FileProvider.getUriForFile(\n        context,\n        "${context.packageName}.fileprovider",\n        file\n    )\n}\n\nfun shareReceipt(context: Context, uri: Uri) {
+fun createReceiptPdf(
+    context: Context,
+    student: Student,
+    paymentsForReceipt: List<Payment>,
+    receiptNo: String,
+    profile: TuitionProfile = TuitionProfile()
+): Uri {
+    val doc = PdfDocument()
+    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
+    val canvas = page.canvas
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    val pageWidth = 595f
+    val left = 42f
+    val right = 553f
+    val navy = Color.rgb(28, 45, 78)
+    val blue = Color.rgb(55, 92, 145)
+    val light = Color.rgb(242, 245, 249)
+    val muted = Color.rgb(90, 100, 115)
+    val green = Color.rgb(35, 125, 75)
+
+    fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {
+        paint.style = Paint.Style.FILL
+        paint.color = color
+        paint.textSize = size
+        paint.isFakeBoldText = bold
+        canvas.drawText(value, x, y, paint)
+    }
+
+    fun center(value: String, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {
+        paint.style = Paint.Style.FILL
+        paint.color = color
+        paint.textSize = size
+        paint.isFakeBoldText = bold
+        canvas.drawText(value, (pageWidth - paint.measureText(value)) / 2f, y, paint)
+    }
+
+    fun rounded(top: Float, bottom: Float, color: Int = Color.WHITE, stroke: Int? = null, width: Float = 1f) {
+        paint.style = if (stroke == null) Paint.Style.FILL else Paint.Style.STROKE
+        paint.color = color
+        paint.strokeWidth = width
+        canvas.drawRoundRect(left, top, right, bottom, 10f, 10f, paint)
+        paint.style = Paint.Style.FILL
+    }
+
+    fun rule(y: Float, color: Int = Color.LTGRAY, width: Float = 1f) {
+        paint.style = Paint.Style.STROKE
+        paint.color = color
+        paint.strokeWidth = width
+        canvas.drawLine(left, y, right, y, paint)
+        paint.style = Paint.Style.FILL
+    }
+
+    fun wrapped(value: String, x: Float, y: Float, maxWidth: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY): Float {
+        paint.textSize = size
+        paint.isFakeBoldText = bold
+        paint.color = color
+        val words = value.split(" ")
+        var line = ""
+        var yy = y
+        for (word in words) {
+            val candidate = if (line.isBlank()) word else "$line $word"
+            if (paint.measureText(candidate) > maxWidth && line.isNotBlank()) {
+                text(line, x, yy, size, bold, color)
+                yy += size + 4f
+                line = word
+            } else line = candidate
+        }
+        if (line.isNotBlank()) {
+            text(line, x, yy, size, bold, color)
+            yy += size + 4f
+        }
+        return yy
+    }
+
+    val sortedPayments = paymentsForReceipt.sortedBy { monthKey(it.month) }
+    val totalPaid = sortedPayments.sumOf { it.amount }
+    val totalFee = student.monthlyFee * sortedPayments.size
+    val status = if (totalPaid >= totalFee) "PAID" else "PARTIAL"
+    val date = sortedPayments.firstOrNull()?.date ?: currentDate()
+
+    // Branded header
+    paint.color = navy
+    paint.style = Paint.Style.FILL
+    canvas.drawRoundRect(left, 28f, right, 145f, 14f, 14f, paint)
+
+    try {
+        val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)
+        if (bitmap != null) {
+            val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 64, 64, true)
+            canvas.drawBitmap(scaled, left + 18f, 48f, paint)
+        }
+    } catch (_: Exception) { }
+
+    text(profile.tuitionName.uppercase(), left + 96f, 67f, 21f, true, Color.WHITE)
+    text(profile.tagline, left + 96f, 88f, 10f, false, Color.WHITE)
+    wrapped(profile.address, left + 96f, 107f, 315f, 8f, false, Color.WHITE)
+    text("FEE RECEIPT", 438f, 69f, 10f, true, Color.WHITE)
+    text("OFFICIAL", 462f, 88f, 8f, true, Color.WHITE)
+
+    // Receipt metadata
+    rounded(158f, 213f, light)
+    text("RECEIPT NO.", left + 16f, 178f, 8f, true, muted)
+    text(receiptNo, left + 16f, 198f, 13f, true, navy)
+    text("PAYMENT DATE", 390f, 178f, 8f, true, muted)
+    text(date, 390f, 198f, 13f, true, navy)
+
+    // Student section
+    text("STUDENT DETAILS", left, 239f, 11f, true, navy)
+    rounded(248f, 345f, Color.WHITE, Color.LTGRAY)
+    text("Student Name", left + 16f, 270f, 8f, true, muted)
+    text(student.name, left + 16f, 290f, 14f, true, Color.DKGRAY)
+    text("Class", left + 16f, 317f, 8f, true, muted)
+    text(student.className.ifBlank { "Not provided" }, left + 16f, 334f, 11f, true)
+    text("Batch", 215f, 317f, 8f, true, muted)
+    text(student.batch.ifBlank { "Not provided" }, 215f, 334f, 11f, true)
+    text("Joining Month", 350f, 317f, 8f, true, muted)
+    text(student.joiningMonth.ifBlank { "Not provided" }, 350f, 334f, 11f, true)
+
+    // Payment section
+    text("PAYMENT DETAILS", left, 374f, 11f, true, navy)
+    rounded(384f, 545f, Color.WHITE, Color.LTGRAY)
+    paint.color = light
+    canvas.drawRect(left + 1f, 385f, right - 1f, 414f, paint)
+    text("FEE MONTH(S)", left + 16f, 403f, 8f, true, muted)
+    text("AMOUNT", 465f, 403f, 8f, true, muted)
+
+    var y = 434f
+    val monthsText = sortedPayments.joinToString(", ") { it.month }
+    y = wrapped(monthsText.ifBlank { "—" }, left + 16f, y, 395f, 10f, true)
+    text("₹$totalPaid", 465f, 434f, 12f, true, navy)
+    rule(maxOf(y + 2f, 465f), Color.LTGRAY, 0.8f)
+    text("Months Covered", left + 16f, maxOf(y + 24f, 490f), 9f, false, muted)
+    text(sortedPayments.size.toString(), 465f, maxOf(y + 24f, 490f), 10f, true)
+    text("Monthly Fee", left + 16f, maxOf(y + 47f, 517f), 9f, false, muted)
+    text("₹${student.monthlyFee}", 440f, maxOf(y + 47f, 517f), 10f, true)
+
+    // Total and status
+    rounded(559f, 640f, light)
+    text("TOTAL PAID", left + 16f, 590f, 9f, true, muted)
+    text("₹$totalPaid", left + 16f, 620f, 23f, true, navy)
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = 1.5f
+    paint.color = if (status == "PAID") green else blue
+    canvas.drawRoundRect(428f, 578f, 537f, 623f, 10f, 10f, paint)
+    paint.style = Paint.Style.FILL
+    center(if (status == "PAID") "PAID" else "PARTIAL", 607f, 13f, true, if (status == "PAID") green else blue)
+
+    // Footer / signature
+    rule(667f, Color.LTGRAY, 1f)
+    text("Thank you for your payment.", left, 694f, 11f, true, navy)
+    text("Please keep this receipt for your records.", left, 712f, 9f, false, muted)
+
+    text("Authorized by", left, 758f, 8f, true, muted)
+    text(profile.teacherName, left, 778f, 12f, true, Color.DKGRAY)
+    text("${profile.qualification} • ${profile.tuitionName}", left, 795f, 8f, false, muted)
+    rule(806f, Color.DKGRAY, 0.8f)
+    text("Signature", left, 820f, 7f, false, muted)
+
+    text("Contact", 390f, 758f, 8f, true, muted)
+    text(profile.phone, 390f, 778f, 11f, true, Color.DKGRAY)
+    wrapped(profile.address, 390f, 796f, 155f, 7f, false, muted)
+    center("Computer-generated receipt • The Math Guide", 836f, 7f, false, muted)
+
+    doc.finishPage(page)
+    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
+    val file = File(dir, "$receiptNo.pdf")
+    file.outputStream().use { doc.writeTo(it) }
+    doc.close()
+
+    return FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        file
+    )
+}
+
+fun shareReceipt(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "application/pdf"
         putExtra(Intent.EXTRA_STREAM, uri)
@@ -1209,7 +1386,93 @@ fun TuitionApp(store: LocalStore) {
     }
 }
 
-@Composable\nfun SecurityPinDialog(\n    title: String,\n    storedPin: String,\n    onDismiss: () -> Unit,\n    onSuccess: () -> Unit\n) {\n    var pin by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("🔐 $title", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Enter your 4-digit security PIN to continue.")\n                OutlinedTextField(\n                    value = pin,\n                    onValueChange = { value -> pin = value.filter(Char::isDigit).take(4); error = "" },\n                    label = { Text("4-digit PIN") },\n                    singleLine = true,\n                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),\n                    visualTransformation = PasswordVisualTransformation(),\n                    modifier = Modifier.fillMaxWidth()\n                )\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = pin.length == 4,\n                onClick = {\n                    if (pin == storedPin) onSuccess()\n                    else { pin = ""; error = "Incorrect PIN. Try again." }\n                }\n            ) { Text("Unlock") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun ChangeSecurityPinDialog(\n    currentPin: String,\n    onDismiss: () -> Unit,\n    onSaved: (String) -> Unit\n) {\n    var current by remember { mutableStateOf("") }\n    var newPin by remember { mutableStateOf("") }\n    var confirm by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    fun pinField(value: String, label: String, onChange: (String) -> Unit) {\n        // Helper body intentionally empty; fields are rendered below so Compose can preserve state.\n    }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("Change Security PIN", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Use exactly 4 digits. The PIN protects payments, student changes and other important actions.")\n                OutlinedTextField(current, { current = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Current PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("New 4-digit PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Confirm new PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = current.length == 4 && newPin.length == 4 && confirm.length == 4,\n                onClick = {\n                    when {\n                        current != currentPin -> error = "Current PIN is incorrect."\n                        newPin == currentPin -> error = "Choose a different PIN."\n                        newPin != confirm -> error = "New PINs do not match."\n                        else -> onSaved(newPin)\n                    }\n                }\n            ) { Text("Save PIN") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun DashboardCard(
+@Composable
+fun SecurityPinDialog(
+    title: String,
+    storedPin: String,
+    onDismiss: () -> Unit,
+    onSuccess: () -> Unit
+) {
+    var pin by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("🔐 $title", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter your 4-digit security PIN to continue.")
+                OutlinedTextField(
+                    value = pin,
+                    onValueChange = { value -> pin = value.filter(Char::isDigit).take(4); error = "" },
+                    label = { Text("4-digit PIN") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = pin.length == 4,
+                onClick = {
+                    if (pin == storedPin) onSuccess()
+                    else { pin = ""; error = "Incorrect PIN. Try again." }
+                }
+            ) { Text("Unlock") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+fun ChangeSecurityPinDialog(
+    currentPin: String,
+    onDismiss: () -> Unit,
+    onSaved: (String) -> Unit
+) {
+    var current by remember { mutableStateOf("") }
+    var newPin by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf("") }
+
+    fun pinField(value: String, label: String, onChange: (String) -> Unit) {
+        // Helper body intentionally empty; fields are rendered below so Compose can preserve state.
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Security PIN", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Use exactly 4 digits. The PIN protects payments, student changes and other important actions.")
+                OutlinedTextField(current, { current = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Current PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("New 4-digit PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Confirm new PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())
+                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = current.length == 4 && newPin.length == 4 && confirm.length == 4,
+                onClick = {
+                    when {
+                        current != currentPin -> error = "Current PIN is incorrect."
+                        newPin == currentPin -> error = "Choose a different PIN."
+                        newPin != confirm -> error = "New PINs do not match."
+                        else -> onSaved(newPin)
+                    }
+                }
+            ) { Text("Save PIN") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+fun DashboardCard(
     title: String,
     value: String,
     modifier: Modifier,
