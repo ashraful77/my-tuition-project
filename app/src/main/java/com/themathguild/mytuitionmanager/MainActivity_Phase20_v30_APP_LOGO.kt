@@ -1180,8 +1180,7 @@ fun TuitionApp(store: LocalStore) {
                 shareReceipt(context, exportBackup(context))
                 lastBackupDate = store.lastBackupDate()
             },
-            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } },
-            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } }
+            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } }
         )
 
         if (manageStudentsOpen) ManageStudentsDialog(
