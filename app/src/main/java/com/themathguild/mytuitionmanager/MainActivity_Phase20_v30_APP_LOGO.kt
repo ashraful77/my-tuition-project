@@ -671,6 +671,7 @@ fun TuitionApp(store: LocalStore) {
     var attendanceOpen by remember { mutableStateOf(false) }
     var academicOpen by remember { mutableStateOf(false) }
     var receiptUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedBottomTab by remember { mutableStateOf(0) }
 
     val thisMonth = currentMonth()
     fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }
@@ -735,8 +736,16 @@ fun TuitionApp(store: LocalStore) {
                             }
                         }
                     },
-                    actions = { IconButton(onClick = { settingsOpen = true }) { Text("⚙", style = MaterialTheme.typography.titleLarge) } }
                 )
+            },
+            bottomBar = {
+                NavigationBar {
+                    NavigationBarItem(selected = selectedBottomTab == 0, onClick = { selectedBottomTab = 0 }, icon = { Text("⌂") }, label = { Text("Home") })
+                    NavigationBarItem(selected = selectedBottomTab == 1, onClick = { selectedBottomTab = 1; manageStudentsOpen = true }, icon = { Text("☷") }, label = { Text("Students") })
+                    NavigationBarItem(selected = selectedBottomTab == 2, onClick = { selectedBottomTab = 2; receiptHistoryOpen = true }, icon = { Text("₹") }, label = { Text("Payments") })
+                    NavigationBarItem(selected = selectedBottomTab == 3, onClick = { selectedBottomTab = 3; reportOpen = true }, icon = { Text("▥") }, label = { Text("Reports") })
+                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { selectedBottomTab = 4; settingsOpen = true }, icon = { Text("⚙") }, label = { Text("Settings") })
+                }
             }
         ) { padding ->
             LazyColumn(
