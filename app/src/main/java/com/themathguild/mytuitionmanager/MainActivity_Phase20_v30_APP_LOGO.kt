@@ -3,6 +3,8 @@ package com.themathguild.mytuitionmanager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Paint
+import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Bundle
@@ -29,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.core.content.FileProvider
@@ -237,6 +240,17 @@ class LocalStore(context: Context) {
             .apply()
     }
 
+    fun securityPin(): String {
+        val saved = prefs.getString("securityPin", "") ?: ""
+        return if (saved.matches(Regex("\\d{4}"))) saved else "1234"
+    }
+
+    fun saveSecurityPin(pin: String) {
+        if (pin.matches(Regex("\\d{4}"))) {
+            prefs.edit().putString("securityPin", pin).apply()
+        }
+    }
+
     fun lastBackupDate(): String =
         prefs.getString("lastBackupDate", "") ?: ""
 
@@ -313,147 +327,7 @@ fun validateFeeCollection(
     return null
 }
 
-fun createReceiptPdf(
-    context: Context,
-    student: Student,
-    paymentsForReceipt: List<Payment>,
-    receiptNo: String,
-    profile: TuitionProfile = TuitionProfile()
-): Uri {
-    val doc = PdfDocument()
-    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
-    val canvas = page.canvas
-    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-
-    val left = 45f
-    val right = 550f
-
-    fun fillText(value: String, x: Float, y: Float, size: Float, bold: Boolean = false) {
-        paint.style = Paint.Style.FILL
-        paint.textSize = size
-        paint.isFakeBoldText = bold
-        canvas.drawText(value, x, y, paint)
-    }
-
-    fun center(value: String, y: Float, size: Float, bold: Boolean = false) {
-        paint.style = Paint.Style.FILL
-        paint.textSize = size
-        paint.isFakeBoldText = bold
-        canvas.drawText(value, (595f - paint.measureText(value)) / 2f, y, paint)
-    }
-
-    fun line(y: Float, width: Float = 1f) {
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = width
-        canvas.drawLine(left, y, right, y, paint)
-        paint.style = Paint.Style.FILL
-    }
-
-    fun box(top: Float, bottom: Float, width: Float = 1.2f) {
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = width
-        canvas.drawRoundRect(left, top, right, bottom, 8f, 8f, paint)
-        paint.style = Paint.Style.FILL
-    }
-
-    val sortedPayments = paymentsForReceipt.sortedBy { monthKey(it.month) }
-    val totalPaid = sortedPayments.sumOf { it.amount }
-    val totalFee = student.monthlyFee * sortedPayments.size
-    val status = if (totalPaid >= totalFee) "PAID" else "PARTIAL"
-    val date = sortedPayments.firstOrNull()?.date ?: currentDate()
-
-    // Professional header
-    center(profile.tuitionName.uppercase(), 58f, 27f, true)
-    center(profile.tagline, 78f, 11f)
-    center("FEE PAYMENT RECEIPT", 112f, 18f, true)
-    line(132f, 1.5f)
-
-    fillText("Receipt No.", left, 158f, 10f)
-    fillText(receiptNo, left, 178f, 14f, true)
-    fillText("Payment Date", 390f, 158f, 10f)
-    fillText(date, 390f, 178f, 14f, true)
-
-    // Student section
-    fillText("STUDENT INFORMATION", left, 210f, 13f, true)
-    box(222f, 330f)
-
-    fillText("Student Name", left + 16f, 246f, 9f)
-    fillText(student.name, left + 16f, 267f, 14f, true)
-
-    fillText("Class", left + 16f, 295f, 9f)
-    fillText(student.className.ifBlank { "Not provided" }, left + 16f, 315f, 12f, true)
-
-    fillText("Batch", 300f, 295f, 9f)
-    fillText(student.batch.ifBlank { "Not provided" }, 300f, 315f, 12f, true)
-
-    fillText("Joining Month", left + 16f, 345f, 9f)
-    fillText(
-        student.joiningMonth.ifBlank { "Not provided" },
-        left + 16f,
-        365f,
-        12f,
-        true
-    )
-
-    // Payment section
-    fillText("PAYMENT SUMMARY", left, 400f, 13f, true)
-    box(412f, 600f)
-
-    fillText("Fee Month(s)", left + 16f, 442f, 9f)
-    fillText(
-        sortedPayments.joinToString(", ") { it.month }.take(52),
-        left + 16f,
-        462f,
-        11f,
-        true
-    )
-
-    line(478f, 0.7f)
-
-    fillText("Months Covered", left + 16f, 508f, 10f)
-    fillText(sortedPayments.size.toString(), 470f, 508f, 12f, true)
-
-    fillText("Monthly Fee", left + 16f, 540f, 10f)
-    fillText("₹${student.monthlyFee}", 440f, 540f, 12f, true)
-
-    line(554f, 0.7f)
-
-    fillText("TOTAL PAID", left + 16f, 585f, 12f, true)
-    fillText("₹$totalPaid", 420f, 585f, 18f, true)
-
-    // Status badge
-    box(620f, 664f, 1.5f)
-    fillText("PAYMENT STATUS", left + 16f, 646f, 10f, true)
-    fillText(status, 470f, 646f, 13f, true)
-
-    center("Thank you for your payment.", 700f, 12f, true)
-    center("Please keep this receipt for your records.", 718f, 9f)
-
-    line(740f)
-
-    fillText("Authorized by", left, 762f, 9f)
-    fillText(profile.teacherName, left, 783f, 12f, true)
-    fillText("${profile.qualification} • ${profile.tuitionName}", left, 801f, 9f)
-
-    fillText("Contact", 390f, 762f, 9f)
-    fillText(profile.phone, 390f, 783f, 11f, true)
-
-    center("Computer-generated receipt", 823f, 8f)
-
-    doc.finishPage(page)
-    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
-    val file = File(dir, "$receiptNo.pdf")
-    file.outputStream().use { doc.writeTo(it) }
-    doc.close()
-
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        file
-    )
-}
-
-fun shareReceipt(context: Context, uri: Uri) {
+fun createReceiptPdf(\n    context: Context,\n    student: Student,\n    paymentsForReceipt: List<Payment>,\n    receiptNo: String,\n    profile: TuitionProfile = TuitionProfile()\n): Uri {\n    val doc = PdfDocument()\n    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())\n    val canvas = page.canvas\n    val paint = Paint(Paint.ANTI_ALIAS_FLAG)\n\n    val pageWidth = 595f\n    val left = 42f\n    val right = 553f\n    val navy = Color.rgb(28, 45, 78)\n    val blue = Color.rgb(55, 92, 145)\n    val light = Color.rgb(242, 245, 249)\n    val muted = Color.rgb(90, 100, 115)\n    val green = Color.rgb(35, 125, 75)\n\n    fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, x, y, paint)\n    }\n\n    fun center(value: String, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, (pageWidth - paint.measureText(value)) / 2f, y, paint)\n    }\n\n    fun rounded(top: Float, bottom: Float, color: Int = Color.WHITE, stroke: Int? = null, width: Float = 1f) {\n        paint.style = if (stroke == null) Paint.Style.FILL else Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawRoundRect(left, top, right, bottom, 10f, 10f, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun rule(y: Float, color: Int = Color.LTGRAY, width: Float = 1f) {\n        paint.style = Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawLine(left, y, right, y, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun wrapped(value: String, x: Float, y: Float, maxWidth: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY): Float {\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        paint.color = color\n        val words = value.split(" ")\n        var line = ""\n        var yy = y\n        for (word in words) {\n            val candidate = if (line.isBlank()) word else "$line $word"\n            if (paint.measureText(candidate) > maxWidth && line.isNotBlank()) {\n                text(line, x, yy, size, bold, color)\n                yy += size + 4f\n                line = word\n            } else line = candidate\n        }\n        if (line.isNotBlank()) {\n            text(line, x, yy, size, bold, color)\n            yy += size + 4f\n        }\n        return yy\n    }\n\n    val sortedPayments = paymentsForReceipt.sortedBy { monthKey(it.month) }\n    val totalPaid = sortedPayments.sumOf { it.amount }\n    val totalFee = student.monthlyFee * sortedPayments.size\n    val status = if (totalPaid >= totalFee) "PAID" else "PARTIAL"\n    val date = sortedPayments.firstOrNull()?.date ?: currentDate()\n\n    // Branded header\n    paint.color = navy\n    paint.style = Paint.Style.FILL\n    canvas.drawRoundRect(left, 28f, right, 145f, 14f, 14f, paint)\n\n    try {\n        val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)\n        if (bitmap != null) {\n            val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 64, 64, true)\n            canvas.drawBitmap(scaled, left + 18f, 48f, paint)\n        }\n    } catch (_: Exception) { }\n\n    text(profile.tuitionName.uppercase(), left + 96f, 67f, 21f, true, Color.WHITE)\n    text(profile.tagline, left + 96f, 88f, 10f, false, Color.WHITE)\n    wrapped(profile.address, left + 96f, 107f, 315f, 8f, false, Color.WHITE)\n    text("FEE RECEIPT", 438f, 69f, 10f, true, Color.WHITE)\n    text("OFFICIAL", 462f, 88f, 8f, true, Color.WHITE)\n\n    // Receipt metadata\n    rounded(158f, 213f, light)\n    text("RECEIPT NO.", left + 16f, 178f, 8f, true, muted)\n    text(receiptNo, left + 16f, 198f, 13f, true, navy)\n    text("PAYMENT DATE", 390f, 178f, 8f, true, muted)\n    text(date, 390f, 198f, 13f, true, navy)\n\n    // Student section\n    text("STUDENT DETAILS", left, 239f, 11f, true, navy)\n    rounded(248f, 345f, Color.WHITE, Color.LTGRAY)\n    text("Student Name", left + 16f, 270f, 8f, true, muted)\n    text(student.name, left + 16f, 290f, 14f, true, Color.DKGRAY)\n    text("Class", left + 16f, 317f, 8f, true, muted)\n    text(student.className.ifBlank { "Not provided" }, left + 16f, 334f, 11f, true)\n    text("Batch", 215f, 317f, 8f, true, muted)\n    text(student.batch.ifBlank { "Not provided" }, 215f, 334f, 11f, true)\n    text("Joining Month", 350f, 317f, 8f, true, muted)\n    text(student.joiningMonth.ifBlank { "Not provided" }, 350f, 334f, 11f, true)\n\n    // Payment section\n    text("PAYMENT DETAILS", left, 374f, 11f, true, navy)\n    rounded(384f, 545f, Color.WHITE, Color.LTGRAY)\n    paint.color = light\n    canvas.drawRect(left + 1f, 385f, right - 1f, 414f, paint)\n    text("FEE MONTH(S)", left + 16f, 403f, 8f, true, muted)\n    text("AMOUNT", 465f, 403f, 8f, true, muted)\n\n    var y = 434f\n    val monthsText = sortedPayments.joinToString(", ") { it.month }\n    y = wrapped(monthsText.ifBlank { "—" }, left + 16f, y, 395f, 10f, true)\n    text("₹$totalPaid", 465f, 434f, 12f, true, navy)\n    rule(maxOf(y + 2f, 465f), Color.LTGRAY, 0.8f)\n    text("Months Covered", left + 16f, maxOf(y + 24f, 490f), 9f, false, muted)\n    text(sortedPayments.size.toString(), 465f, maxOf(y + 24f, 490f), 10f, true)\n    text("Monthly Fee", left + 16f, maxOf(y + 47f, 517f), 9f, false, muted)\n    text("₹${student.monthlyFee}", 440f, maxOf(y + 47f, 517f), 10f, true)\n\n    // Total and status\n    rounded(559f, 640f, light)\n    text("TOTAL PAID", left + 16f, 590f, 9f, true, muted)\n    text("₹$totalPaid", left + 16f, 620f, 23f, true, navy)\n    paint.style = Paint.Style.STROKE\n    paint.strokeWidth = 1.5f\n    paint.color = if (status == "PAID") green else blue\n    canvas.drawRoundRect(428f, 578f, 537f, 623f, 10f, 10f, paint)\n    paint.style = Paint.Style.FILL\n    center(if (status == "PAID") "PAID" else "PARTIAL", 607f, 13f, true, if (status == "PAID") green else blue)\n\n    // Footer / signature\n    rule(667f, Color.LTGRAY, 1f)\n    text("Thank you for your payment.", left, 694f, 11f, true, navy)\n    text("Please keep this receipt for your records.", left, 712f, 9f, false, muted)\n\n    text("Authorized by", left, 758f, 8f, true, muted)\n    text(profile.teacherName, left, 778f, 12f, true, Color.DKGRAY)\n    text("${profile.qualification} • ${profile.tuitionName}", left, 795f, 8f, false, muted)\n    rule(806f, Color.DKGRAY, 0.8f)\n    text("Signature", left, 820f, 7f, false, muted)\n\n    text("Contact", 390f, 758f, 8f, true, muted)\n    text(profile.phone, 390f, 778f, 11f, true, Color.DKGRAY)\n    wrapped(profile.address, 390f, 796f, 155f, 7f, false, muted)\n    center("Computer-generated receipt • The Math Guide", 836f, 7f, false, muted)\n\n    doc.finishPage(page)\n    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }\n    val file = File(dir, "$receiptNo.pdf")\n    file.outputStream().use { doc.writeTo(it) }\n    doc.close()\n\n    return FileProvider.getUriForFile(\n        context,\n        "${context.packageName}.fileprovider",\n        file\n    )\n}\n\nfun shareReceipt(context: Context, uri: Uri) {
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "application/pdf"
         putExtra(Intent.EXTRA_STREAM, uri)
@@ -672,6 +546,16 @@ fun TuitionApp(store: LocalStore) {
     var academicOpen by remember { mutableStateOf(false) }
     var receiptUri by remember { mutableStateOf<Uri?>(null) }
     var selectedBottomTab by remember { mutableStateOf(0) }
+    var securityPinOpen by remember { mutableStateOf(false) }
+    var securityPinTitle by remember { mutableStateOf("Security PIN") }
+    var securityPinAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var changePinOpen by remember { mutableStateOf(false) }
+
+    fun requireSecurityPin(title: String, action: () -> Unit) {
+        securityPinTitle = title
+        securityPinAction = action
+        securityPinOpen = true
+    }
 
     val thisMonth = currentMonth()
     fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }
@@ -742,8 +626,10 @@ fun TuitionApp(store: LocalStore) {
                 NavigationBar {
                     NavigationBarItem(selected = selectedBottomTab == 0, onClick = { selectedBottomTab = 0 }, icon = { Text("⌂") }, label = { Text("Home") })
                     NavigationBarItem(selected = selectedBottomTab == 1, onClick = { selectedBottomTab = 1; manageStudentsOpen = true }, icon = { Text("☷") }, label = { Text("Students") })
-                    NavigationBarItem(selected = selectedBottomTab == 2, onClick = { selectedBottomTab = 2; receiptHistoryOpen = true }, icon = { Text("₹") }, label = { Text("Payments") })
-                    NavigationBarItem(selected = selectedBottomTab == 3, onClick = { selectedBottomTab = 3; reportOpen = true }, icon = { Text("▥") }, label = { Text("Reports") })
+                    NavigationBarItem(selected = selectedBottomTab == 2, onClick = {
+                        requireSecurityPin("Add Student") { addOpen = true; selectedBottomTab = 2 }
+                    }, icon = { Text("＋") }, label = { Text("Add Student") })
+                    NavigationBarItem(selected = selectedBottomTab == 3, onClick = { selectedBottomTab = 3; receiptHistoryOpen = true }, icon = { Text("₹") }, label = { Text("Payments") })
                     NavigationBarItem(selected = selectedBottomTab == 4, onClick = { selectedBottomTab = 4; settingsOpen = true }, icon = { Text("⚙") }, label = { Text("Settings") })
                 }
             }
@@ -858,7 +744,7 @@ fun TuitionApp(store: LocalStore) {
                                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    FilledTonalButton(onClick = { addOpen = true }) { Text("＋ Student") }
+                                    FilledTonalButton(onClick = { requireSecurityPin("Add Student") { addOpen = true } }) { Text("＋ Student") }
                                     FilledTonalButton(onClick = { attendanceOpen = true }) { Text("📅 Attendance") }
                                     FilledTonalButton(onClick = { reportOpen = true }) { Text("📊 Reports") }
                                     FilledTonalButton(onClick = { receiptHistoryOpen = true }) { Text("🧾 History") }
@@ -1056,7 +942,7 @@ fun TuitionApp(store: LocalStore) {
                             }
 
                             FilledTonalButton(
-                                onClick = { collectStudent = student },
+                                onClick = { requireSecurityPin("Make Payment") { collectStudent = student } },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(if (due > 0) "Collect Fee • ₹$due" else "View / Collect Fee")
@@ -1075,29 +961,57 @@ fun TuitionApp(store: LocalStore) {
             }
         }
 
+        if (securityPinOpen) {
+            SecurityPinDialog(
+                title = securityPinTitle,
+                storedPin = store.securityPin(),
+                onDismiss = { securityPinOpen = false; securityPinAction = null },
+                onSuccess = {
+                    val action = securityPinAction
+                    securityPinOpen = false
+                    securityPinAction = null
+                    action?.invoke()
+                }
+            )
+        }
+
+        if (changePinOpen) {
+            ChangeSecurityPinDialog(
+                currentPin = store.securityPin(),
+                onDismiss = { changePinOpen = false },
+                onSaved = { newPin ->
+                    store.saveSecurityPin(newPin)
+                    changePinOpen = false
+                    Toast.makeText(context, "Security PIN changed successfully.", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+
         if (settingsOpen) SettingsDialog(
             onDismiss = { settingsOpen = false },
-            onAdd = { settingsOpen = false; addOpen = true },
+            onAdd = { settingsOpen = false; requireSecurityPin("Add Student") { addOpen = true } },
             onManage = { manageStudentsOpen = true },
-            onAttendance = { settingsOpen = false; attendanceOpen = true },
-            onAcademic = { settingsOpen = false; academicOpen = true },
+            onAttendance = { settingsOpen = false; requireSecurityPin("Attendance") { attendanceOpen = true } },
+            onAcademic = { settingsOpen = false; requireSecurityPin("Academic Records") { academicOpen = true } },
             onReports = { settingsOpen = false; reportOpen = true },
             onReceiptHistory = { settingsOpen = false; receiptHistoryOpen = true },
-            onTuitionProfile = { settingsOpen = false; tuitionProfileOpen = true },
-            onDemoTools = { settingsOpen = false; demoToolsOpen = true },
+            onTuitionProfile = { settingsOpen = false; requireSecurityPin("Tuition Profile") { tuitionProfileOpen = true } },
+            onDemoTools = { settingsOpen = false; requireSecurityPin("Demo / Test Data") { demoToolsOpen = true } },
+            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } },
             lastBackupDate = lastBackupDate,
             onBackup = {
                 shareReceipt(context, exportBackup(context))
                 lastBackupDate = store.lastBackupDate()
             },
-            onRestore = { restoreConfirmOpen = true }
+            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } },
+            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } }
         )
 
         if (manageStudentsOpen) ManageStudentsDialog(
             students = students,
             onDismiss = { manageStudentsOpen = false },
-            onEdit = { s -> manageStudentsOpen = false; settingsOpen = false; editStudent = s },
-            onDelete = { s ->
+            onEdit = { s -> requireSecurityPin("Edit Student") { manageStudentsOpen = false; settingsOpen = false; editStudent = s } },
+            onDelete = { s -> requireSecurityPin("Delete Student") {
                 students = students.filter { it.id != s.id }
                 payments = payments.filter { it.studentId != s.id }
                 attendance = attendance.filter { it.studentId != s.id }
@@ -1106,7 +1020,7 @@ fun TuitionApp(store: LocalStore) {
                 store.savePayments(payments)
                 store.saveAttendance(attendance)
                 store.saveAcademicRecords(academicRecords)
-            }
+            } }
         )
 
         if (addOpen) StudentEditorDialog("Add Student", null, { addOpen = false }) { s -> students = students + s; store.saveStudents(students); addOpen = false }
@@ -1117,7 +1031,7 @@ fun TuitionApp(store: LocalStore) {
                 payments = payments.filter { it.studentId == s.id },
                 outstanding = outstanding(s),
                 onDismiss = { selectedStudent = null },
-                onCollect = { collectStudent = s; selectedStudent = null }
+                onCollect = { requireSecurityPin("Make Payment") { collectStudent = s; selectedStudent = null } }
             )
         }
         collectStudent?.let { s ->
@@ -1191,8 +1105,8 @@ fun TuitionApp(store: LocalStore) {
                 students = students,
                 payments = payments,
                 onDismiss = { receiptHistoryOpen = false },
-                onEditPayment = { editPaymentOpen = it },
-                onDeletePayment = { deletePaymentConfirm = it }
+                onEditPayment = { payment -> requireSecurityPin("Edit Payment") { editPaymentOpen = payment } },
+                onDeletePayment = { payment -> requireSecurityPin("Delete Payment") { deletePaymentConfirm = payment } }
             )
         }
 
@@ -1295,8 +1209,7 @@ fun TuitionApp(store: LocalStore) {
     }
 }
 
-@Composable
-fun DashboardCard(
+@Composable\nfun SecurityPinDialog(\n    title: String,\n    storedPin: String,\n    onDismiss: () -> Unit,\n    onSuccess: () -> Unit\n) {\n    var pin by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("🔐 $title", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Enter your 4-digit security PIN to continue.")\n                OutlinedTextField(\n                    value = pin,\n                    onValueChange = { value -> pin = value.filter(Char::isDigit).take(4); error = "" },\n                    label = { Text("4-digit PIN") },\n                    singleLine = true,\n                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),\n                    visualTransformation = PasswordVisualTransformation(),\n                    modifier = Modifier.fillMaxWidth()\n                )\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = pin.length == 4,\n                onClick = {\n                    if (pin == storedPin) onSuccess()\n                    else { pin = ""; error = "Incorrect PIN. Try again." }\n                }\n            ) { Text("Unlock") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun ChangeSecurityPinDialog(\n    currentPin: String,\n    onDismiss: () -> Unit,\n    onSaved: (String) -> Unit\n) {\n    var current by remember { mutableStateOf("") }\n    var newPin by remember { mutableStateOf("") }\n    var confirm by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    fun pinField(value: String, label: String, onChange: (String) -> Unit) {\n        // Helper body intentionally empty; fields are rendered below so Compose can preserve state.\n    }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("Change Security PIN", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Use exactly 4 digits. The PIN protects payments, student changes and other important actions.")\n                OutlinedTextField(current, { current = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Current PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("New 4-digit PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Confirm new PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = current.length == 4 && newPin.length == 4 && confirm.length == 4,\n                onClick = {\n                    when {\n                        current != currentPin -> error = "Current PIN is incorrect."\n                        newPin == currentPin -> error = "Choose a different PIN."\n                        newPin != confirm -> error = "New PINs do not match."\n                        else -> onSaved(newPin)\n                    }\n                }\n            ) { Text("Save PIN") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun DashboardCard(
     title: String,
     value: String,
     modifier: Modifier,
@@ -1896,7 +1809,8 @@ fun SettingsDialog(
     onDemoTools: () -> Unit,
     lastBackupDate: String,
     onBackup: () -> Unit,
-    onRestore: () -> Unit
+    onRestore: () -> Unit,
+    onSecurityPin: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -1952,6 +1866,14 @@ fun SettingsDialog(
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
+                SettingsButton("🔐  Security PIN", onSecurityPin)
+                Text(
+                    "A 4-digit PIN is required before payments, student changes and other important modifications.",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                Spacer(Modifier.height(4.dp))
+
                 Text(
                     "Tip: keep a backup before editing or deleting payments.",
                     style = MaterialTheme.typography.bodySmall,
