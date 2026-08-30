@@ -755,7 +755,7 @@ fun TuitionApp(store: LocalStore) {
     val expectedThisMonth = students.sumOf { it.monthlyFee }
     val batches = listOf("All") + students.map { it.batch }.filter { it.isNotBlank() }.distinct().sorted()
     val classes = listOf("All") + students.map { it.className }.filter { it.isNotBlank() }.distinct().sorted()
-    val visibleStudents = students.filter {
+    val visibleStudents = students.filter { it.status.equals("Active", true) }.filter {
         it.name.contains(search, true) || it.className.contains(search, true) || it.batch.contains(search, true) || it.phone.contains(search, true)
     }.filter { selectedBatch == "All" || it.batch == selectedBatch }
      .filter { selectedClass == "All" || it.className == selectedClass }
@@ -1063,6 +1063,11 @@ fun TuitionApp(store: LocalStore) {
                                         "Class ${student.className}  •  Batch ${student.batch}",
                                         style = MaterialTheme.typography.bodyMedium
                                     )
+                                    Text(
+                                        "Status: ${student.status}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 }
 
                                 AssistChip(
@@ -1199,8 +1204,8 @@ fun TuitionApp(store: LocalStore) {
             } }
         )
 
-        if (addOpen) StudentEditorDialog("Add Student", null, { addOpen = false }) { s -> students = students + s; store.saveStudents(students); addOpen = false }
-        editStudent?.let { s -> StudentEditorDialog("Edit Student", s, { editStudent = null }) { u -> students = students.map { if (it.id == u.id) u else it }; store.saveStudents(students); editStudent = null } }
+        if (addOpen) StudentEditorDialog("Add Student", null, { addOpen = false }, batchesData) { s -> students = students + s; store.saveStudents(students); addOpen = false }
+        editStudent?.let { s -> StudentEditorDialog("Edit Student", s, { editStudent = null }, batchesData) { u -> students = students.map { if (it.id == u.id) u else it }; store.saveStudents(students); editStudent = null } }
         selectedStudent?.let { s ->
             StudentDetailsDialog(
                 student = s,
@@ -2207,7 +2212,11 @@ fun ManageStudentsDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (students.isEmpty()) Text("No students available.")
-                students.sortedBy { it.name.lowercase() }.forEach { s ->
+                listOf("Active", "Paused", "Left").forEach { section ->
+                    val group = students.filter { it.status.equals(section,true) }.sortedBy { it.name.lowercase() }
+                    if (group.isNotEmpty()) {
+                        Text("$section Students (${group.size})", fontWeight=FontWeight.Bold)
+                        group.forEach { s ->
                     Card {
                         Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -2247,7 +2256,8 @@ fun StudentEditorDialog(
     title: String,
     initialStudent: Student?,
     onDismiss: () -> Unit,
-    onSave: (Student) -> Unit
+    onSave: (Student) -> Unit,
+    availableBatches: List<TuitionBatch> = emptyList()
 ) {
     val standardClasses = listOf("V", "VI", "VII", "VIII", "IX", "X")
     val existing = initialStudent?.className ?: ""
@@ -2260,7 +2270,8 @@ fun StudentEditorDialog(
         mutableStateOf(if (existing.isNotBlank() && existing !in standardClasses) existing else "")
     }
     var classOpen by remember { mutableStateOf(false) }
-    var batch by remember { mutableStateOf(initialStudent?.batch ?: "") }
+    var batch by remember { mutableStateOf(initialStudent?.batch ?: availableBatches.firstOrNull()?.name ?: "") }
+    var batchMenu by remember { mutableStateOf(false) }
     var fee by remember { mutableStateOf(initialStudent?.monthlyFee?.toString() ?: "") }
     var phone by remember { mutableStateOf(initialStudent?.phone ?: "") }
     var school by remember { mutableStateOf(initialStudent?.school ?: "") }
@@ -2349,10 +2360,14 @@ fun StudentEditorDialog(
                     )
                 }
 
-                OutlinedTextField(
-                    batch, { batch = it }, label = { Text("Batch") },
-                    singleLine = true, modifier = Modifier.fillMaxWidth()
-                )
+                if (availableBatches.isNotEmpty()) {
+                    Box(Modifier.fillMaxWidth()) {
+                        OutlinedButton(onClick={ batchMenu=true }, modifier=Modifier.fillMaxWidth()) { Text(if(batch.isBlank()) "Select Batch" else "Batch: $batch") }
+                        DropdownMenu(batchMenu,{batchMenu=false}) { availableBatches.sortedBy{it.name.lowercase()}.forEach { b -> DropdownMenuItem(text={Text(b.name)},onClick={batch=b.name;batchMenu=false}) } }
+                    }
+                } else {
+                    OutlinedTextField(batch,{batch=it},label={Text("Batch")},singleLine=true,modifier=Modifier.fillMaxWidth())
+                }
 
                 OutlinedTextField(
                     fee, { fee = it }, label = { Text("Monthly fee") },
@@ -2890,11 +2905,17 @@ fun ReceiptHistoryDialog(
     val studentMap = students.associateBy { it.id }
     var selectedReceipt by remember { mutableStateOf<List<Payment>?>(null) }
     var selectedStudent by remember { mutableStateOf<Student?>(null) }
+    var receiptSearch by remember { mutableStateOf("") }
 
     val receiptGroups = payments
         .filter { it.receiptNo.isNotBlank() }
         .groupBy { it.receiptNo }
         .values
+        .filter { group ->
+            val r = group.firstOrNull()
+            val studentName = r?.let { studentMap[it.studentId]?.name }.orEmpty()
+            receiptSearch.isBlank() || r?.receiptNo?.contains(receiptSearch,true) == true || studentName.contains(receiptSearch,true)
+        }
         .sortedByDescending { it.firstOrNull()?.date.orEmpty() }
 
     AlertDialog(
@@ -2905,6 +2926,12 @@ fun ReceiptHistoryDialog(
                 Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                OutlinedTextField(
+                    value=receiptSearch, onValueChange={receiptSearch=it},
+                    label={Text("Search receipt no. or student name")}, singleLine=true,
+                    trailingIcon={if(receiptSearch.isNotBlank()) TextButton(onClick={receiptSearch=""}){Text("Clear")}},
+                    modifier=Modifier.fillMaxWidth()
+                )
                 Text(
                     "Open or share any previous receipt.",
                     style = MaterialTheme.typography.bodySmall
