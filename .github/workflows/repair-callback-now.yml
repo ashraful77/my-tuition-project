@@ -1,0 +1,39 @@
+name: Repair security callback
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  repair:
+    if: github.event.head_commit.message != 'Repair security callback'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Remove duplicate onSecurityPin
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt')
+          s = p.read_text()
+          needle = '            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } }'
+          first = s.find(needle)
+          second = s.find(needle, first + 1) if first >= 0 else -1
+          if second >= 0:
+              s = s[:second] + s[second + len(needle) + 1:]
+              p.write_text(s)
+              print('Removed duplicate callback.')
+          else:
+              print('No duplicate callback found.')
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt
+          git diff --cached --quiet && exit 0
+          git commit -m "Repair security callback"
+          git push origin HEAD:main
