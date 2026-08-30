@@ -1,0 +1,145 @@
+name: Apply security and receipt improvements
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.event.head_commit.message != 'Apply security and receipt improvements'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Patch MainActivity
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt')
+          s = path.read_text()
+
+          # Imports needed for secure PIN entry and logo rendering in receipts.
+          s = s.replace(
+              'import android.graphics.Paint\n',
+              'import android.graphics.Paint\nimport android.graphics.BitmapFactory\nimport android.graphics.Color\n', 1)
+          s = s.replace(
+              'import androidx.compose.ui.text.input.KeyboardType\n',
+              'import androidx.compose.ui.text.input.KeyboardType\nimport androidx.compose.ui.text.input.PasswordVisualTransformation\n', 1)
+
+          # Local security PIN storage. Existing installs get a simple default PIN 1234;
+          # it can be changed from Settings -> Security PIN.
+          marker = '    fun lastBackupDate(): String =\n'
+          security_methods = '''    fun securityPin(): String {\n        val saved = prefs.getString("securityPin", "") ?: ""\n        return if (saved.matches(Regex("\\\\d{4}"))) saved else "1234"\n    }\n\n    fun saveSecurityPin(pin: String) {\n        if (pin.matches(Regex("\\\\d{4}"))) {\n            prefs.edit().putString("securityPin", pin).apply()\n        }\n    }\n\n'''
+          if 'fun securityPin(): String' not in s:
+              if marker not in s:
+                  raise SystemExit('LocalStore insertion marker not found')
+              s = s.replace(marker, security_methods + marker, 1)
+
+          # Bottom navigation: Reports becomes Add Student.
+          old_nav = '''                NavigationBar {\n                    NavigationBarItem(selected = selectedBottomTab == 0, onClick = { selectedBottomTab = 0 }, icon = { Text("⌂") }, label = { Text("Home") })\n                    NavigationBarItem(selected = selectedBottomTab == 1, onClick = { selectedBottomTab = 1; manageStudentsOpen = true }, icon = { Text("☷") }, label = { Text("Students") })\n                    NavigationBarItem(selected = selectedBottomTab == 2, onClick = { selectedBottomTab = 2; receiptHistoryOpen = true }, icon = { Text("₹") }, label = { Text("Payments") })\n                    NavigationBarItem(selected = selectedBottomTab == 3, onClick = { selectedBottomTab = 3; reportOpen = true }, icon = { Text("▥") }, label = { Text("Reports") })\n                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { selectedBottomTab = 4; settingsOpen = true }, icon = { Text("⚙") }, label = { Text("Settings") })\n                }'''
+          new_nav = '''                NavigationBar {\n                    NavigationBarItem(selected = selectedBottomTab == 0, onClick = { selectedBottomTab = 0 }, icon = { Text("⌂") }, label = { Text("Home") })\n                    NavigationBarItem(selected = selectedBottomTab == 1, onClick = { selectedBottomTab = 1; manageStudentsOpen = true }, icon = { Text("☷") }, label = { Text("Students") })\n                    NavigationBarItem(selected = selectedBottomTab == 2, onClick = {\n                        requireSecurityPin("Add Student") { addOpen = true; selectedBottomTab = 2 }\n                    }, icon = { Text("＋") }, label = { Text("Add Student") })\n                    NavigationBarItem(selected = selectedBottomTab == 3, onClick = { selectedBottomTab = 3; receiptHistoryOpen = true }, icon = { Text("₹") }, label = { Text("Payments") })\n                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { selectedBottomTab = 4; settingsOpen = true }, icon = { Text("⚙") }, label = { Text("Settings") })\n                }'''
+          if old_nav not in s:
+              raise SystemExit('bottom navigation block not found')
+          s = s.replace(old_nav, new_nav, 1)
+
+          # Security state and helper inside TuitionApp.
+          state_marker = '    var selectedBottomTab by remember { mutableStateOf(0) }\n'
+          security_state = '''    var selectedBottomTab by remember { mutableStateOf(0) }\n    var securityPinOpen by remember { mutableStateOf(false) }\n    var securityPinTitle by remember { mutableStateOf("Security PIN") }\n    var securityPinAction by remember { mutableStateOf<(() -> Unit)?>(null) }\n    var changePinOpen by remember { mutableStateOf(false) }\n\n    fun requireSecurityPin(title: String, action: () -> Unit) {\n        securityPinTitle = title\n        securityPinAction = action\n        securityPinOpen = true\n    }\n'''
+          if 'var securityPinOpen by remember' not in s:
+              if state_marker not in s:
+                  raise SystemExit('security state marker not found')
+              s = s.replace(state_marker, security_state, 1)
+
+          # Quick Add Student now requires PIN.
+          s = s.replace('FilledTonalButton(onClick = { addOpen = true }) { Text("＋ Student") }',
+                        'FilledTonalButton(onClick = { requireSecurityPin("Add Student") { addOpen = true } }) { Text("＋ Student") }', 1)
+
+          # Settings callback gains Security PIN and sensitive actions are gated.
+          s = s.replace(
+              '            onAdd = { settingsOpen = false; addOpen = true },\n            onManage = { manageStudentsOpen = true },\n            onAttendance = { settingsOpen = false; attendanceOpen = true },\n            onAcademic = { settingsOpen = false; academicOpen = true },',
+              '            onAdd = { settingsOpen = false; requireSecurityPin("Add Student") { addOpen = true } },\n            onManage = { manageStudentsOpen = true },\n            onAttendance = { settingsOpen = false; requireSecurityPin("Attendance") { attendanceOpen = true } },\n            onAcademic = { settingsOpen = false; requireSecurityPin("Academic Records") { academicOpen = true } },', 1)
+          s = s.replace(
+              '            onTuitionProfile = { settingsOpen = false; tuitionProfileOpen = true },\n            onDemoTools = { settingsOpen = false; demoToolsOpen = true },',
+              '            onTuitionProfile = { settingsOpen = false; requireSecurityPin("Tuition Profile") { tuitionProfileOpen = true } },\n            onDemoTools = { settingsOpen = false; requireSecurityPin("Demo / Test Data") { demoToolsOpen = true } },\n            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } },', 1)
+
+          # Student edit/delete are protected at the point of action.
+          s = s.replace(
+              '            onEdit = { s -> manageStudentsOpen = false; settingsOpen = false; editStudent = s },\n            onDelete = { s ->\n                students = students.filter { it.id != s.id }',
+              '            onEdit = { s -> requireSecurityPin("Edit Student") { manageStudentsOpen = false; settingsOpen = false; editStudent = s } },\n            onDelete = { s -> requireSecurityPin("Delete Student") {\n                students = students.filter { it.id != s.id }', 1)
+          s = s.replace(
+              '                store.saveAcademicRecords(academicRecords)\n            }\n        )\n\n        if (addOpen)',
+              '                store.saveAcademicRecords(academicRecords)\n            } }\n        )\n\n        if (addOpen)', 1)
+
+          # Add/edit student save operations remain behind the PIN-gated entry points.
+          # Payment collection is protected at both entry points.
+          s = s.replace(
+              '                onCollect = { collectStudent = s; selectedStudent = null }',
+              '                onCollect = { requireSecurityPin("Make Payment") { collectStudent = s; selectedStudent = null } }', 1)
+          s = s.replace(
+              '                                onClick = { collectStudent = student },',
+              '                                onClick = { requireSecurityPin("Make Payment") { collectStudent = student } },', 1)
+
+          # Receipt history edit/delete are protected before opening the mutation dialog.
+          s = s.replace(
+              '                onEditPayment = { editPaymentOpen = it },\n                onDeletePayment = { deletePaymentConfirm = it }',
+              '                onEditPayment = { payment -> requireSecurityPin("Edit Payment") { editPaymentOpen = payment } },\n                onDeletePayment = { payment -> requireSecurityPin("Delete Payment") { deletePaymentConfirm = payment } }', 1)
+
+          # Restore requires PIN; backup remains available without a PIN.
+          s = s.replace('            onRestore = { restoreConfirmOpen = true }',
+                        '            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } }', 1)
+
+          # Add Security PIN callback to SettingsDialog call.
+          s = s.replace(
+              '            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } }\n        )',
+              '            onRestore = { requireSecurityPin("Restore Backup") { restoreConfirmOpen = true } },\n            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } }\n        )', 1)
+
+          # Insert the security dialogs before the settings dialog rendering.
+          dialog_marker = '        if (settingsOpen) SettingsDialog(\n'
+          security_dialogs = '''        if (securityPinOpen) {\n            SecurityPinDialog(\n                title = securityPinTitle,\n                storedPin = store.securityPin(),\n                onDismiss = { securityPinOpen = false; securityPinAction = null },\n                onSuccess = {\n                    val action = securityPinAction\n                    securityPinOpen = false\n                    securityPinAction = null\n                    action?.invoke()\n                }\n            )\n        }\n\n        if (changePinOpen) {\n            ChangeSecurityPinDialog(\n                currentPin = store.securityPin(),\n                onDismiss = { changePinOpen = false },\n                onSaved = { newPin ->\n                    store.saveSecurityPin(newPin)\n                    changePinOpen = false\n                    Toast.makeText(context, "Security PIN changed successfully.", Toast.LENGTH_SHORT).show()\n                }\n            )\n        }\n\n'''
+          if 'if (securityPinOpen) {' not in s:
+              if dialog_marker not in s:
+                  raise SystemExit('dialog insertion marker not found')
+              s = s.replace(dialog_marker, security_dialogs + dialog_marker, 1)
+
+          # Replace the existing receipt generator with a cleaner professional one.
+          start = s.index('fun createReceiptPdf(')
+          end = s.index('fun shareReceipt(context: Context, uri: Uri)', start)
+          receipt = r'''fun createReceiptPdf(\n    context: Context,\n    student: Student,\n    paymentsForReceipt: List<Payment>,\n    receiptNo: String,\n    profile: TuitionProfile = TuitionProfile()\n): Uri {\n    val doc = PdfDocument()\n    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())\n    val canvas = page.canvas\n    val paint = Paint(Paint.ANTI_ALIAS_FLAG)\n\n    val pageWidth = 595f\n    val left = 42f\n    val right = 553f\n    val navy = Color.rgb(28, 45, 78)\n    val blue = Color.rgb(55, 92, 145)\n    val light = Color.rgb(242, 245, 249)\n    val muted = Color.rgb(90, 100, 115)\n    val green = Color.rgb(35, 125, 75)\n\n    fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, x, y, paint)\n    }\n\n    fun center(value: String, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {\n        paint.style = Paint.Style.FILL\n        paint.color = color\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        canvas.drawText(value, (pageWidth - paint.measureText(value)) / 2f, y, paint)\n    }\n\n    fun rounded(top: Float, bottom: Float, color: Int = Color.WHITE, stroke: Int? = null, width: Float = 1f) {\n        paint.style = if (stroke == null) Paint.Style.FILL else Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawRoundRect(left, top, right, bottom, 10f, 10f, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun rule(y: Float, color: Int = Color.LTGRAY, width: Float = 1f) {\n        paint.style = Paint.Style.STROKE\n        paint.color = color\n        paint.strokeWidth = width\n        canvas.drawLine(left, y, right, y, paint)\n        paint.style = Paint.Style.FILL\n    }\n\n    fun wrapped(value: String, x: Float, y: Float, maxWidth: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY): Float {\n        paint.textSize = size\n        paint.isFakeBoldText = bold\n        paint.color = color\n        val words = value.split(" ")\n        var line = ""\n        var yy = y\n        for (word in words) {\n            val candidate = if (line.isBlank()) word else "$line $word"\n            if (paint.measureText(candidate) > maxWidth && line.isNotBlank()) {\n                text(line, x, yy, size, bold, color)\n                yy += size + 4f\n                line = word\n            } else line = candidate\n        }\n        if (line.isNotBlank()) {\n            text(line, x, yy, size, bold, color)\n            yy += size + 4f\n        }\n        return yy\n    }\n\n    val sortedPayments = paymentsForReceipt.sortedBy { monthKey(it.month) }\n    val totalPaid = sortedPayments.sumOf { it.amount }\n    val totalFee = student.monthlyFee * sortedPayments.size\n    val status = if (totalPaid >= totalFee) "PAID" else "PARTIAL"\n    val date = sortedPayments.firstOrNull()?.date ?: currentDate()\n\n    // Branded header\n    paint.color = navy\n    paint.style = Paint.Style.FILL\n    canvas.drawRoundRect(left, 28f, right, 145f, 14f, 14f, paint)\n\n    try {\n        val bitmap = BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)\n        if (bitmap != null) {\n            val scaled = android.graphics.Bitmap.createScaledBitmap(bitmap, 64, 64, true)\n            canvas.drawBitmap(scaled, left + 18f, 48f, paint)\n        }\n    } catch (_: Exception) { }\n\n    text(profile.tuitionName.uppercase(), left + 96f, 67f, 21f, true, Color.WHITE)\n    text(profile.tagline, left + 96f, 88f, 10f, false, Color.WHITE)\n    wrapped(profile.address, left + 96f, 107f, 315f, 8f, false, Color.WHITE)\n    text("FEE RECEIPT", 438f, 69f, 10f, true, Color.WHITE)\n    text("OFFICIAL", 462f, 88f, 8f, true, Color.WHITE)\n\n    // Receipt metadata\n    rounded(158f, 213f, light)\n    text("RECEIPT NO.", left + 16f, 178f, 8f, true, muted)\n    text(receiptNo, left + 16f, 198f, 13f, true, navy)\n    text("PAYMENT DATE", 390f, 178f, 8f, true, muted)\n    text(date, 390f, 198f, 13f, true, navy)\n\n    // Student section\n    text("STUDENT DETAILS", left, 239f, 11f, true, navy)\n    rounded(248f, 345f, Color.WHITE, Color.LTGRAY)\n    text("Student Name", left + 16f, 270f, 8f, true, muted)\n    text(student.name, left + 16f, 290f, 14f, true, Color.DKGRAY)\n    text("Class", left + 16f, 317f, 8f, true, muted)\n    text(student.className.ifBlank { "Not provided" }, left + 16f, 334f, 11f, true)\n    text("Batch", 215f, 317f, 8f, true, muted)\n    text(student.batch.ifBlank { "Not provided" }, 215f, 334f, 11f, true)\n    text("Joining Month", 350f, 317f, 8f, true, muted)\n    text(student.joiningMonth.ifBlank { "Not provided" }, 350f, 334f, 11f, true)\n\n    // Payment section\n    text("PAYMENT DETAILS", left, 374f, 11f, true, navy)\n    rounded(384f, 545f, Color.WHITE, Color.LTGRAY)\n    paint.color = light\n    canvas.drawRect(left + 1f, 385f, right - 1f, 414f, paint)\n    text("FEE MONTH(S)", left + 16f, 403f, 8f, true, muted)\n    text("AMOUNT", 465f, 403f, 8f, true, muted)\n\n    var y = 434f\n    val monthsText = sortedPayments.joinToString(", ") { it.month }\n    y = wrapped(monthsText.ifBlank { "—" }, left + 16f, y, 395f, 10f, true)\n    text("₹$totalPaid", 465f, 434f, 12f, true, navy)\n    rule(maxOf(y + 2f, 465f), Color.LTGRAY, 0.8f)\n    text("Months Covered", left + 16f, maxOf(y + 24f, 490f), 9f, false, muted)\n    text(sortedPayments.size.toString(), 465f, maxOf(y + 24f, 490f), 10f, true)\n    text("Monthly Fee", left + 16f, maxOf(y + 47f, 517f), 9f, false, muted)\n    text("₹${student.monthlyFee}", 440f, maxOf(y + 47f, 517f), 10f, true)\n\n    // Total and status\n    rounded(559f, 640f, light)\n    text("TOTAL PAID", left + 16f, 590f, 9f, true, muted)\n    text("₹$totalPaid", left + 16f, 620f, 23f, true, navy)\n    paint.style = Paint.Style.STROKE\n    paint.strokeWidth = 1.5f\n    paint.color = if (status == "PAID") green else blue\n    canvas.drawRoundRect(428f, 578f, 537f, 623f, 10f, 10f, paint)\n    paint.style = Paint.Style.FILL\n    center(if (status == "PAID") "PAID" else "PARTIAL", 607f, 13f, true, if (status == "PAID") green else blue)\n\n    // Footer / signature\n    rule(667f, Color.LTGRAY, 1f)\n    text("Thank you for your payment.", left, 694f, 11f, true, navy)\n    text("Please keep this receipt for your records.", left, 712f, 9f, false, muted)\n\n    text("Authorized by", left, 758f, 8f, true, muted)\n    text(profile.teacherName, left, 778f, 12f, true, Color.DKGRAY)\n    text("${profile.qualification} • ${profile.tuitionName}", left, 795f, 8f, false, muted)\n    rule(806f, Color.DKGRAY, 0.8f)\n    text("Signature", left, 820f, 7f, false, muted)\n\n    text("Contact", 390f, 758f, 8f, true, muted)\n    text(profile.phone, 390f, 778f, 11f, true, Color.DKGRAY)\n    wrapped(profile.address, 390f, 796f, 155f, 7f, false, muted)\n    center("Computer-generated receipt • The Math Guide", 836f, 7f, false, muted)\n\n    doc.finishPage(page)\n    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }\n    val file = File(dir, "$receiptNo.pdf")\n    file.outputStream().use { doc.writeTo(it) }\n    doc.close()\n\n    return FileProvider.getUriForFile(\n        context,\n        "${context.packageName}.fileprovider",\n        file\n    )\n}\n\n'''
+          s = s[:start] + receipt + s[end:]
+
+          # Add Security PIN callback parameter to SettingsDialog declaration and UI.
+          sig = '    onRestore: () -> Unit\n) {'
+          new_sig = '    onRestore: () -> Unit,\n    onSecurityPin: () -> Unit\n) {'
+          if sig not in s:
+              raise SystemExit('SettingsDialog signature marker not found')
+          s = s.replace(sig, new_sig, 1)
+          safety_marker = '                Text(\n                    "Tip: keep a backup before editing or deleting payments.",\n'
+          security_button = '''                SettingsButton("🔐  Security PIN", onSecurityPin)\n                Text(\n                    "A 4-digit PIN is required before payments, student changes and other important modifications.",\n                    style = MaterialTheme.typography.bodySmall,\n                    modifier = Modifier.padding(horizontal = 8.dp)\n                )\n                Spacer(Modifier.height(4.dp))\n\n'''
+          if 'SettingsButton("🔐  Security PIN", onSecurityPin)' not in s:
+              if safety_marker not in s:
+                  raise SystemExit('Settings safety marker not found')
+              s = s.replace(safety_marker, security_button + safety_marker, 1)
+
+          # Add PIN dialogs and helper functions before DashboardCard.
+          helper_marker = '@Composable\nfun DashboardCard('
+          helpers = r'''@Composable\nfun SecurityPinDialog(\n    title: String,\n    storedPin: String,\n    onDismiss: () -> Unit,\n    onSuccess: () -> Unit\n) {\n    var pin by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("🔐 $title", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Enter your 4-digit security PIN to continue.")\n                OutlinedTextField(\n                    value = pin,\n                    onValueChange = { value -> pin = value.filter(Char::isDigit).take(4); error = "" },\n                    label = { Text("4-digit PIN") },\n                    singleLine = true,\n                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),\n                    visualTransformation = PasswordVisualTransformation(),\n                    modifier = Modifier.fillMaxWidth()\n                )\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = pin.length == 4,\n                onClick = {\n                    if (pin == storedPin) onSuccess()\n                    else { pin = ""; error = "Incorrect PIN. Try again." }\n                }\n            ) { Text("Unlock") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun ChangeSecurityPinDialog(\n    currentPin: String,\n    onDismiss: () -> Unit,\n    onSaved: (String) -> Unit\n) {\n    var current by remember { mutableStateOf("") }\n    var newPin by remember { mutableStateOf("") }\n    var confirm by remember { mutableStateOf("") }\n    var error by remember { mutableStateOf("") }\n\n    fun pinField(value: String, label: String, onChange: (String) -> Unit) {\n        // Helper body intentionally empty; fields are rendered below so Compose can preserve state.\n    }\n\n    AlertDialog(\n        onDismissRequest = onDismiss,\n        title = { Text("Change Security PIN", fontWeight = FontWeight.Bold) },\n        text = {\n            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                Text("Use exactly 4 digits. The PIN protects payments, student changes and other important actions.")\n                OutlinedTextField(current, { current = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Current PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(newPin, { newPin = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("New 4-digit PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                OutlinedTextField(confirm, { confirm = it.filter(Char::isDigit).take(4); error = "" }, label = { Text("Confirm new PIN") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), visualTransformation = PasswordVisualTransformation(), modifier = Modifier.fillMaxWidth())\n                if (error.isNotBlank()) Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)\n            }\n        },\n        confirmButton = {\n            Button(\n                enabled = current.length == 4 && newPin.length == 4 && confirm.length == 4,\n                onClick = {\n                    when {\n                        current != currentPin -> error = "Current PIN is incorrect."\n                        newPin == currentPin -> error = "Choose a different PIN."\n                        newPin != confirm -> error = "New PINs do not match."\n                        else -> onSaved(newPin)\n                    }\n                }\n            ) { Text("Save PIN") }\n        },\n        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }\n    )\n}\n\n@Composable\nfun DashboardCard('''
+          if 'fun SecurityPinDialog(' not in s:
+              if helper_marker not in s:
+                  raise SystemExit('helper insertion marker not found')
+              s = s.replace(helper_marker, helpers, 1)
+
+          path.write_text(s)
+          print('Security, Add Student navigation, and receipt improvements applied.')
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase20_v30_APP_LOGO.kt
+          git diff --cached --quiet && exit 0
+          git commit -m "Apply security and receipt improvements"
+          git push origin HEAD:main
