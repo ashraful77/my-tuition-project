@@ -1139,8 +1139,14 @@ fun TuitionApp(store: LocalStore) {
                 }
             }
         ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                if (selectedBottomTab == 0) {
             LazyColumn(
-                Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp, vertical = 10.dp),
+                Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
@@ -1249,34 +1255,7 @@ fun TuitionApp(store: LocalStore) {
                     }
                 }
 
-            }
-        }
-
-        if (securityPinOpen) {
-            SecurityPinDialog(
-                title = securityPinTitle,
-                storedPin = store.securityPin(),
-                onDismiss = { securityPinOpen = false; securityPinAction = null },
-                onSuccess = {
-                    val action = securityPinAction
-                    securityPinOpen = false
-                    securityPinAction = null
-                    action?.invoke()
                 }
-            )
-        }
-
-        if (changePinOpen) {
-            ChangeSecurityPinDialog(
-                currentPin = store.securityPin(),
-                onDismiss = { changePinOpen = false },
-                onSaved = { newPin ->
-                    store.saveSecurityPin(newPin)
-                    changePinOpen = false
-                    Toast.makeText(context, "Security PIN changed successfully.", Toast.LENGTH_SHORT).show()
-                }
-            )
-        }
 
         if (selectedBottomTab == 4) SettingsDialog(
             onDismiss = { selectedBottomTab = 0 },
@@ -1615,8 +1594,36 @@ fun TuitionApp(store: LocalStore) {
             } },
             onDelete = { item -> libraryItems = libraryItems.filterNot { it.id == item.id }; store.saveLibrary(libraryItems) }
         )
-        if (todayWorkOpen) TodayWorkDialog(routines, batchNotes, { todayWorkOpen=false }, { selectedBottomTab=2; todayWorkOpen=false })
         if (selectedBottomTab == 2) LiveBatchDialog(routines, batchNotes, { selectedBottomTab=0 }, { updated -> batchNotes=updated; store.saveBatchNotes(updated) })
+            }
+        }
+        if (securityPinOpen) {
+            SecurityPinDialog(
+                title = securityPinTitle,
+                storedPin = store.securityPin(),
+                onDismiss = { securityPinOpen = false; securityPinAction = null },
+                onSuccess = {
+                    val action = securityPinAction
+                    securityPinOpen = false
+                    securityPinAction = null
+                    action?.invoke()
+                }
+            )
+        }
+
+        if (changePinOpen) {
+            ChangeSecurityPinDialog(
+                currentPin = store.securityPin(),
+                onDismiss = { changePinOpen = false },
+                onSaved = { newPin ->
+                    store.saveSecurityPin(newPin)
+                    changePinOpen = false
+                    Toast.makeText(context, "Security PIN changed successfully.", Toast.LENGTH_SHORT).show()
+                }
+            )
+        }
+
+        if (todayWorkOpen) TodayWorkDialog(routines, batchNotes, { todayWorkOpen=false }, { selectedBottomTab=2; todayWorkOpen=false })
 
     }
 }
@@ -1657,9 +1664,7 @@ private fun FullScreenPage(
     dismissButton: @Composable (() -> Unit)? = null
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(bottom = 80.dp),
+        modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
     ) {
         Column(Modifier.fillMaxSize()) {
