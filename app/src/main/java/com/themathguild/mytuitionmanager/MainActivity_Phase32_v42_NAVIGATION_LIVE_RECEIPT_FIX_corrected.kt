@@ -883,7 +883,7 @@ fun TuitionApp(store: LocalStore) {
     var deletePaymentConfirm by remember { mutableStateOf<Payment?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     var tuitionProfileOpen by remember { mutableStateOf(false) }
-    var dashboardExpanded by remember { mutableStateOf(false) }
+    var dashboardExpanded by remember { mutableStateOf(true) }
     var sortOption by remember { mutableStateOf("Name A–Z") }
     var selectedClass by remember { mutableStateOf("All") }
     var filtersExpanded by remember { mutableStateOf(false) }
@@ -1019,7 +1019,7 @@ fun TuitionApp(store: LocalStore) {
                                 contentScale = ContentScale.Crop
                             )
                             Column {
-                                Text("The Math Guide", fontWeight = FontWeight.Bold)
+                                Text(tuitionProfile.tuitionName, fontWeight = FontWeight.Bold)
                                 Text("My Tuition Manager", style = MaterialTheme.typography.labelSmall)
                             }
                         }
@@ -1062,8 +1062,11 @@ fun TuitionApp(store: LocalStore) {
                                     contentScale = ContentScale.Crop
                                 )
                                 Column(Modifier.weight(1f)) {
-                                    Text("Ashraful Hoque", fontWeight = FontWeight.Bold)
-                                    Text("B.SC Maths • The Math Guide", style = MaterialTheme.typography.labelSmall)
+                                    Text(tuitionProfile.teacherName, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "${tuitionProfile.qualification} • ${tuitionProfile.tuitionName}",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
                                 }
                             }
                         }
@@ -1079,7 +1082,7 @@ fun TuitionApp(store: LocalStore) {
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column {
-                                    Text("Dashboard", fontWeight = FontWeight.Bold)
+                                    Text("This Month", fontWeight = FontWeight.Bold)
                                     Text(
                                         "${students.size} students • ${money(totalCollected)} collected • ${money(totalOutstanding)} due",
                                         style = MaterialTheme.typography.labelSmall
@@ -1095,15 +1098,15 @@ fun TuitionApp(store: LocalStore) {
                                 Spacer(Modifier.height(7.dp))
 
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    DashboardCard("Students", students.size.toString(), Modifier.weight(1f), onClick = { paymentFilter = "All" })
-                                    DashboardCard("Collected", money(totalCollected), Modifier.weight(1f), onClick = { paymentFilter = "Paid" })
-                                    DashboardCard("Due", money(totalOutstanding), Modifier.weight(1f), onClick = { paymentFilter = "Due" })
+                                    DashboardCard("Students", students.size.toString(), Modifier.weight(1f), MaterialTheme.colorScheme.secondaryContainer) { paymentFilter = "All" }
+                                    DashboardCard("Collected", money(totalCollected), Modifier.weight(1f), MaterialTheme.colorScheme.primaryContainer) { paymentFilter = "Paid" }
+                                    DashboardCard("Due", money(totalOutstanding), Modifier.weight(1f), MaterialTheme.colorScheme.errorContainer) { paymentFilter = "Due" }
                                 }
                                 Spacer(Modifier.height(6.dp))
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    DashboardCard("Paid", "$paidStudents / ${students.size}", Modifier.weight(1f), onClick = { paymentFilter = "Paid" })
-                                    DashboardCard("Partial", partialStudents.toString(), Modifier.weight(1f), onClick = { paymentFilter = "Partial" })
-                                    DashboardCard("Unpaid", unpaidStudents.toString(), Modifier.weight(1f), onClick = { paymentFilter = "Unpaid" })
+                                    DashboardCard("Paid", "$paidStudents / ${students.size}", Modifier.weight(1f), MaterialTheme.colorScheme.primaryContainer) { paymentFilter = "Paid" }
+                                    DashboardCard("Partial", partialStudents.toString(), Modifier.weight(1f), MaterialTheme.colorScheme.tertiaryContainer) { paymentFilter = "Partial" }
+                                    DashboardCard("Unpaid", unpaidStudents.toString(), Modifier.weight(1f), MaterialTheme.colorScheme.errorContainer) { paymentFilter = "Unpaid" }
                                 }
 
                                 val percent = if (expectedThisMonth == 0) 0
@@ -1121,7 +1124,7 @@ fun TuitionApp(store: LocalStore) {
                                         if (expectedThisMonth == 0) 0f
                                         else (totalCollected.toFloat() / expectedThisMonth.toFloat()).coerceIn(0f, 1f)
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(4.dp)
+                                    modifier = Modifier.fillMaxWidth().height(6.dp)
                                 )
                             }
                         }
@@ -1767,11 +1770,13 @@ fun DashboardCard(
     title: String,
     value: String,
     modifier: Modifier,
+    containerColor: ComposeColor = MaterialTheme.colorScheme.surfaceVariant,
     onClick: () -> Unit = {}
 ) {
     Card(
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = containerColor)
     ) {
         Column(
             Modifier.padding(12.dp),
@@ -1789,6 +1794,30 @@ fun DashboardCard(
             )
         }
     }
+}
+
+@Composable
+fun StatusBadge(label: String, onClick: () -> Unit = {}) {
+    val colors = when (label.uppercase()) {
+        "PAID", "PRESENT", "ACTIVE" -> AssistChipDefaults.assistChipColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            labelColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        "PARTIAL", "LATE", "PAUSED" -> AssistChipDefaults.assistChipColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+            labelColor = MaterialTheme.colorScheme.onTertiaryContainer
+        )
+        "DUE", "ABSENT", "LEFT" -> AssistChipDefaults.assistChipColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer,
+            labelColor = MaterialTheme.colorScheme.onErrorContainer
+        )
+        else -> AssistChipDefaults.assistChipColors()
+    }
+    AssistChip(
+        onClick = onClick,
+        label = { Text(label, fontWeight = FontWeight.SemiBold) },
+        colors = colors
+    )
 }
 
 @Composable
@@ -2627,7 +2656,7 @@ fun ManageStudentsDialog(
                                                 style = MaterialTheme.typography.bodyMedium
                                             )
                                         }
-                                        AssistChip(onClick = { onOpenProfile(student) }, label = { Text(paymentStatus) })
+                                        StatusBadge(paymentStatus) { onOpenProfile(student) }
                                     }
 
                                     Row(
@@ -2635,7 +2664,7 @@ fun ManageStudentsDialog(
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        AssistChip(onClick = {}, label = { Text(student.status) })
+                                        StatusBadge(student.status)
                                         if (paymentStatus != "PAID") {
                                             Text("Due ₹$due", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
                                         } else {
