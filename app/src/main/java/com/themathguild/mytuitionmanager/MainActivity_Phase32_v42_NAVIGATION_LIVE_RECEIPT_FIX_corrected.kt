@@ -932,12 +932,6 @@ fun TuitionApp(store: LocalStore) {
         demoToolsOpen = false
         batchManagerOpen = false
         libraryOpen = false
-        when (tab) {
-            1 -> manageStudentsOpen = true
-            2 -> liveBatchOpen = true
-            3 -> receiptHistoryOpen = true
-            4 -> settingsOpen = true
-        }
     }
 
     fun requireSecurityPin(title: String, action: () -> Unit) {
@@ -1175,21 +1169,21 @@ fun TuitionApp(store: LocalStore) {
             )
         }
 
-        if (settingsOpen) SettingsDialog(
-            onDismiss = { settingsOpen = false; selectedBottomTab = 0 },
-            onAdd = { settingsOpen = false; guarded("addStudent", "Add Student") { addOpen = true } },
-            onManage = { settingsOpen = false; manageStudentsOpen = true },
-            onAttendance = { settingsOpen = false; guarded("attendance", "Attendance") { attendanceOpen = true } },
-            onAcademic = { settingsOpen = false; guarded("academic", "Academic Records") { academicOpen = true } },
-            onReports = { settingsOpen = false; reportOpen = true },
-            onReceiptHistory = { settingsOpen = false; receiptHistoryOpen = true },
-            onTuitionProfile = { settingsOpen = false; guarded("profile", "Tuition Profile") { tuitionProfileOpen = true } },
-            onDemoTools = { settingsOpen = false; guarded("demo", "Demo / Test Data") { demoToolsOpen = true } },
-            onSecurityPin = { settingsOpen = false; requireSecurityPin("Change Security PIN") { changePinOpen = true } },
-            onTheme = { settingsOpen = false; themeOpen = true },
-            onSecurityControls = { settingsOpen = false; securityControlsOpen = true },
-            onBatches = { settingsOpen = false; batchManagerOpen = true },
-            onLibrary = { settingsOpen = false; libraryOpen = true },
+        if (selectedBottomTab == 4) SettingsDialog(
+            onDismiss = { selectedBottomTab = 0 },
+            onAdd = { selectedBottomTab = 0; guarded("addStudent", "Add Student") { addOpen = true } },
+            onManage = { selectedBottomTab = 1 },
+            onAttendance = { selectedBottomTab = 0; guarded("attendance", "Attendance") { attendanceOpen = true } },
+            onAcademic = { selectedBottomTab = 0; guarded("academic", "Academic Records") { academicOpen = true } },
+            onReports = { selectedBottomTab = 0; reportOpen = true },
+            onReceiptHistory = { selectedBottomTab = 3 },
+            onTuitionProfile = { selectedBottomTab = 0; guarded("profile", "Tuition Profile") { tuitionProfileOpen = true } },
+            onDemoTools = { selectedBottomTab = 0; guarded("demo", "Demo / Test Data") { demoToolsOpen = true } },
+            onSecurityPin = { selectedBottomTab = 0; requireSecurityPin("Change Security PIN") { changePinOpen = true } },
+            onTheme = { selectedBottomTab = 0; themeOpen = true },
+            onSecurityControls = { selectedBottomTab = 0; securityControlsOpen = true },
+            onBatches = { selectedBottomTab = 0; batchManagerOpen = true },
+            onLibrary = { selectedBottomTab = 0; libraryOpen = true },
             lastBackupDate = lastBackupDate,
             onBackup = {
                 shareReceipt(context, exportBackup(context))
@@ -1198,15 +1192,15 @@ fun TuitionApp(store: LocalStore) {
             onRestore = { guarded("restore", "Restore Backup") { restoreConfirmOpen = true } }
         )
 
-        if (manageStudentsOpen) ManageStudentsDialog(
+        if (selectedBottomTab == 1) ManageStudentsDialog(
             students = students,
             payments = payments,
             attendance = attendance,
             outstandingFor = { outstanding(it) },
-            onDismiss = { manageStudentsOpen = false; selectedBottomTab = 0 },
-            onOpenProfile = { s -> manageStudentsOpen = false; selectedStudent = s },
-            onCollect = { s -> guarded("payment", "Make Payment") { manageStudentsOpen = false; collectStudent = s } },
-            onEdit = { s -> guarded("editStudent", "Edit Student") { manageStudentsOpen = false; settingsOpen = false; editStudent = s } },
+            onDismiss = { selectedBottomTab = 0 },
+            onOpenProfile = { s -> selectedBottomTab = 0; selectedStudent = s },
+            onCollect = { s -> guarded("payment", "Make Payment") { selectedBottomTab = 0; collectStudent = s } },
+            onEdit = { s -> guarded("editStudent", "Edit Student") { selectedBottomTab = 0; editStudent = s } },
             onDelete = { s -> guarded("deleteStudent", "Delete Student") {
                 students = students.filter { it.id != s.id }
                 payments = payments.filter { it.studentId != s.id }
@@ -1371,12 +1365,12 @@ fun TuitionApp(store: LocalStore) {
                 onDismiss = { reportOpen = false }
             )
         }
-        if (receiptHistoryOpen) {
+        if (selectedBottomTab == 3) {
             ReceiptHistoryDialog(
                 students = students,
                 payments = payments,
                 profile = tuitionProfile,
-                onDismiss = { receiptHistoryOpen = false; selectedBottomTab = 0 },
+                onDismiss = { selectedBottomTab = 0 },
                 onEditPayment = { payment -> guarded("editPayment", "Edit Payment") { editPaymentOpen = payment } },
                 onDeletePayment = { payment -> guarded("deletePayment", "Delete Payment") { deletePaymentConfirm = payment } }
             )
@@ -1512,8 +1506,8 @@ fun TuitionApp(store: LocalStore) {
             } },
             onDelete = { item -> libraryItems = libraryItems.filterNot { it.id == item.id }; store.saveLibrary(libraryItems) }
         )
-        if (todayWorkOpen) TodayWorkDialog(routines, batchNotes, { todayWorkOpen=false }, { liveBatchOpen=true; todayWorkOpen=false })
-        if (liveBatchOpen) LiveBatchDialog(routines, batchNotes, { liveBatchOpen=false }, { updated -> batchNotes=updated; store.saveBatchNotes(updated) })
+        if (todayWorkOpen) TodayWorkDialog(routines, batchNotes, { todayWorkOpen=false }, { selectedBottomTab=2; todayWorkOpen=false })
+        if (selectedBottomTab == 2) LiveBatchDialog(routines, batchNotes, { selectedBottomTab=0 }, { updated -> batchNotes=updated; store.saveBatchNotes(updated) })
 
     }
 }
