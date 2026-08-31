@@ -395,7 +395,7 @@ fun validateFeeCollection(
     return null
 }
 
-fun createReceiptPdf(
+private fun legacyReceiptPdf(
     context: Context,
     student: Student,
     paymentsForReceipt: List<Payment>,
@@ -584,6 +584,115 @@ fun createReceiptPdf(
         "${context.packageName}.fileprovider",
         file
     )
+}
+
+fun createReceiptPdf(
+    context: Context,
+    student: Student,
+    paymentsForReceipt: List<Payment>,
+    receiptNo: String,
+    profile: TuitionProfile = TuitionProfile()
+): Uri {
+    val doc = PdfDocument()
+    val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
+    val canvas = page.canvas
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    val left = 38f
+    val right = 557f
+    val navy = Color.rgb(24, 43, 74)
+    val blue = Color.rgb(44, 88, 148)
+    val paleBlue = Color.rgb(237, 243, 251)
+    val paleGreen = Color.rgb(232, 246, 237)
+    val muted = Color.rgb(92, 103, 118)
+    val sorted = paymentsForReceipt.sortedBy { monthKey(it.month) }
+    val total = sorted.sumOf { it.amount }
+    val isPaid = total >= student.monthlyFee * sorted.size
+
+    fun text(value: String, x: Float, y: Float, size: Float, bold: Boolean = false, color: Int = Color.DKGRAY) {
+        paint.style = Paint.Style.FILL; paint.color = color; paint.textSize = size; paint.isFakeBoldText = bold
+        canvas.drawText(value, x, y, paint)
+    }
+    fun line(x1: Float, y1: Float, x2: Float, y2: Float, color: Int = Color.LTGRAY, width: Float = 1f) {
+        paint.style = Paint.Style.STROKE; paint.strokeWidth = width; paint.color = color
+        canvas.drawLine(x1, y1, x2, y2, paint); paint.style = Paint.Style.FILL
+    }
+    fun fill(l: Float, top: Float, r: Float, bottom: Float, color: Int) {
+        paint.style = Paint.Style.FILL; paint.color = color; canvas.drawRect(l, top, r, bottom, paint)
+    }
+    fun labelValue(label: String, value: String, x: Float, y: Float) {
+        text(label.uppercase(), x, y, 7.5f, true, muted)
+        text(value, x, y + 17f, 10.5f, true, navy)
+    }
+
+    fill(left, 30f, right, 113f, navy)
+    try {
+        BitmapFactory.decodeResource(context.resources, R.drawable.app_logo)?.let { bitmap ->
+            canvas.drawBitmap(android.graphics.Bitmap.createScaledBitmap(bitmap, 46, 46, true), left + 14f, 47f, paint)
+        }
+    } catch (_: Exception) { }
+    text(profile.tuitionName.uppercase(), left + 74f, 58f, 18f, true, Color.WHITE)
+    text(profile.tagline.take(52), left + 74f, 77f, 9f, false, Color.WHITE)
+    text(profile.address.take(72), left + 74f, 94f, 7.5f, false, Color.WHITE)
+    text("PAYMENT RECEIPT", right - 128f, 58f, 10f, true, Color.WHITE)
+    text("OFFICIAL COPY", right - 105f, 76f, 7.5f, true, Color.WHITE)
+
+    fill(left, 131f, right, 181f, paleBlue)
+    labelValue("Receipt no.", receiptNo, left + 14f, 146f)
+    labelValue("Payment date", sorted.firstOrNull()?.date ?: currentDate(), 302f, 146f)
+
+    text("STUDENT INFORMATION", left, 208f, 10f, true, navy)
+    fill(left, 218f, right, 276f, Color.WHITE)
+    line(left, 218f, right, 218f); line(left, 276f, right, 276f); line(left, 247f, right, 247f)
+    line(298f, 218f, 298f, 276f)
+    labelValue("Student name", student.name.take(42), left + 12f, 232f)
+    labelValue("Class / batch", "${student.className.ifBlank { "—" }}  •  ${student.batch.ifBlank { "—" }}", 310f, 232f)
+    labelValue("Joining month", student.joiningMonth.ifBlank { "Not provided" }, left + 12f, 261f)
+    labelValue("Monthly fee", "₹${student.monthlyFee}", 310f, 261f)
+
+    text("PAYMENT DETAILS", left, 304f, 10f, true, navy)
+    fill(left, 314f, right, 340f, navy)
+    text("FEE MONTH", left + 12f, 331f, 8f, true, Color.WHITE)
+    text("DATE", 335f, 331f, 8f, true, Color.WHITE)
+    text("AMOUNT", 474f, 331f, 8f, true, Color.WHITE)
+    val visibleRows = sorted.take(5)
+    visibleRows.forEachIndexed { index, payment ->
+        val top = 340f + index * 27f
+        if (index % 2 == 0) fill(left, top, right, top + 27f, Color.rgb(249, 250, 252))
+        line(left, top + 27f, right, top + 27f)
+        text(payment.month.take(32), left + 12f, top + 18f, 9.5f, index == 0)
+        text(payment.date, 335f, top + 18f, 9f)
+        text("₹${payment.amount}", 474f, top + 18f, 10f, true, navy)
+    }
+    var detailsBottom = 340f + maxOf(1, visibleRows.size) * 27f
+    if (sorted.size > visibleRows.size) {
+        fill(left, detailsBottom, right, detailsBottom + 25f, paleBlue)
+        text("+ ${sorted.size - visibleRows.size} more month(s) recorded in payment history", left + 12f, detailsBottom + 17f, 8.5f, false, muted)
+        detailsBottom += 25f
+    }
+    line(left, 314f, left, detailsBottom); line(right, 314f, right, detailsBottom)
+
+    val totalTop = detailsBottom + 22f
+    fill(left, totalTop, right, totalTop + 64f, if (isPaid) paleGreen else paleBlue)
+    text("TOTAL PAID", left + 14f, totalTop + 20f, 8f, true, muted)
+    text("₹$total", left + 14f, totalTop + 48f, 24f, true, navy)
+    text("MONTHS COVERED", 300f, totalTop + 20f, 8f, true, muted)
+    text(sorted.size.toString(), 300f, totalTop + 43f, 14f, true, navy)
+    val statusColor = if (isPaid) Color.rgb(32, 120, 70) else blue
+    text(if (isPaid) "PAID" else "PARTIAL", 455f, totalTop + 39f, 13f, true, statusColor)
+
+    val footerTop = totalTop + 100f
+    line(left, footerTop, right, footerTop, Color.LTGRAY)
+    text("Authorized by", left, footerTop + 24f, 8f, true, muted)
+    text(profile.teacherName, left, footerTop + 43f, 11f, true, navy)
+    text("Contact: ${profile.phone}", 350f, footerTop + 43f, 10f, true, navy)
+    text("Computer-generated receipt • Please retain for your records", left, footerTop + 66f, 8f, false, muted)
+
+    doc.finishPage(page)
+    val dir = File(context.cacheDir, "receipts").apply { mkdirs() }
+    val file = File(dir, "$receiptNo.pdf")
+    file.outputStream().use { doc.writeTo(it) }
+    doc.close()
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
 fun shareReceipt(context: Context, uri: Uri) {
@@ -2189,15 +2298,46 @@ fun createAcademicProgressPdf(context: Context, student: Student, record: Academ
     val page = doc.startPage(PdfDocument.PageInfo.Builder(595, 842, 1).create())
     val canvas = page.canvas
     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    fun t(v:String,x:Float,y:Float,size:Float,bold:Boolean=false,color:Int=Color.DKGRAY){paint.color=color;paint.textSize=size;paint.isFakeBoldText=bold;paint.style=Paint.Style.FILL;canvas.drawText(v,x,y,paint)}
-    fun line(y:Float){paint.color=Color.LTGRAY;paint.strokeWidth=1f;canvas.drawLine(45f,y,550f,y,paint)}
-    t(profile.tuitionName,45f,65f,24f,true,Color.rgb(28,45,78)); t("Test Progress Report",45f,92f,15f,true,Color.rgb(55,92,145)); line(110f)
-    t("Student",55f,145f,11f); t(student.name,180f,145f,13f,true); t("Class",55f,170f,11f); t(student.className,180f,170f,13f,true); t("Date",55f,195f,11f); t(record.date,180f,195f,13f,true)
-    t("Subject",55f,220f,11f); t(record.subject.ifBlank{"—"},180f,220f,13f,true); t("Test",55f,245f,11f); t(record.title.ifBlank{"Test / Exam"},180f,245f,13f,true)
-    line(265f); t("Current Result",55f,300f,12f,true); t("${record.marks.toCleanNumber()} / ${record.maxMarks.toCleanNumber()}",55f,340f,24f,true,Color.rgb(35,125,75)); val pct=if(record.maxMarks>0)((record.marks/record.maxMarks)*100).roundToInt() else 0; t("$pct%",460f,340f,22f,true)
-    if(previous!=null){ val pp=if(previous.maxMarks>0)((previous.marks/previous.maxMarks)*100).roundToInt() else 0; t("Previous Test",55f,390f,12f,true); t("${previous.marks.toCleanNumber()} / ${previous.maxMarks.toCleanNumber()} ($pp%)",55f,420f,15f); t("Change",55f,450f,11f); t("${if(pct-pp>=0)"+" else ""}${pct-pp}%",180f,450f,15f,true) } else { t("Previous Test",55f,390f,12f,true); t("No previous result for this subject.",55f,420f,13f) }
-    if(record.remarks.isNotBlank()){ line(475f); t("Teacher Remarks",55f,510f,12f,true); t(record.remarks,55f,540f,13f) }
-    line(680f); t("The Math Guide",55f,715f,12f,true); t(profile.teacherName,55f,738f,11f); t("Generated on ${currentDate()}",55f,770f,10f, false, Color.GRAY)
+    val left=42f; val right=553f; val navy=Color.rgb(24,43,74); val pale=Color.rgb(237,243,251); val muted=Color.rgb(92,103,118)
+    fun t(v:String,x:Float,y:Float,size:Float,bold:Boolean=false,color:Int=Color.DKGRAY){paint.color=color;paint.textSize=size;paint.isFakeBoldText=bold;paint.style=Paint.Style.FILL;canvas.drawText(v.take(60),x,y,paint)}
+    fun fill(l:Float,top:Float,r:Float,bottom:Float,color:Int){paint.style=Paint.Style.FILL;paint.color=color;canvas.drawRect(l,top,r,bottom,paint)}
+    fun line(x1:Float,y1:Float,x2:Float,y2:Float,color:Int=Color.LTGRAY){paint.style=Paint.Style.STROKE;paint.color=color;paint.strokeWidth=1f;canvas.drawLine(x1,y1,x2,y2,paint);paint.style=Paint.Style.FILL}
+    fun field(label:String,value:String,x:Float,y:Float){t(label.uppercase(),x,y,7.5f,true,muted);t(value,x,y+17f,10f,true,navy)}
+    val pct=if(record.maxMarks>0)((record.marks/record.maxMarks)*100).roundToInt() else 0
+    val previousPct=previous?.let { if(it.maxMarks>0)((it.marks/it.maxMarks)*100).roundToInt() else 0 }
+
+    fill(left,30f,right,106f,navy)
+    t(profile.tuitionName.uppercase(),left+15f,58f,19f,true,Color.WHITE)
+    t("ACADEMIC PROGRESS REPORT",left+15f,80f,10f,true,Color.WHITE)
+    t("Issued: ${currentDate()}",right-112f,80f,8f,false,Color.WHITE)
+
+    t("STUDENT & ASSESSMENT DETAILS",left,133f,10f,true,navy)
+    fill(left,143f,right,230f,Color.WHITE)
+    line(left,143f,right,143f);line(left,230f,right,230f);line(left,172f,right,172f);line(left,201f,right,201f);line(298f,143f,298f,230f)
+    field("Student",student.name,left+12f,157f);field("Class / batch","${student.className.ifBlank{"—"}}  •  ${student.batch.ifBlank{"—"}}",310f,157f)
+    field("Subject",record.subject.ifBlank{"Not provided"},left+12f,186f);field("Assessment",record.title.ifBlank{"Test / Exam"},310f,186f)
+    field("Assessment date",record.date,left+12f,215f);field("Maximum marks",record.maxMarks.toCleanNumber(),310f,215f)
+
+    t("MARKS SUMMARY",left,258f,10f,true,navy)
+    fill(left,268f,right,295f,navy)
+    t("ASSESSMENT",left+12f,286f,8f,true,Color.WHITE);t("MARKS OBTAINED",250f,286f,8f,true,Color.WHITE);t("PERCENTAGE",390f,286f,8f,true,Color.WHITE);t("CHANGE",485f,286f,8f,true,Color.WHITE)
+    fun resultRow(top:Float,label:String,marks:String,percent:String,change:String="—") { fill(left,top,right,top+31f,if(label=="Current") pale else Color.WHITE); line(left,top+31f,right,top+31f); t(label,left+12f,top+20f,10f,label=="Current",navy);t(marks,250f,top+20f,10f,true,navy);t(percent,390f,top+20f,10f,true,navy);t(change,485f,top+20f,10f,true,navy) }
+    resultRow(295f,"Current","${record.marks.toCleanNumber()} / ${record.maxMarks.toCleanNumber()}","$pct%",previousPct?.let { "${if(pct-it>=0) "+" else ""}${pct-it}%" } ?: "—")
+    previous?.let { resultRow(326f,"Previous","${it.marks.toCleanNumber()} / ${it.maxMarks.toCleanNumber()}","${previousPct}%") }
+    line(left,268f,left,if(previous==null)326f else 357f);line(right,268f,right,if(previous==null)326f else 357f)
+
+    val remarksTop=if(previous==null)365f else 396f
+    t("TEACHER REMARKS",left,remarksTop,10f,true,navy)
+    fill(left,remarksTop+10f,right,remarksTop+76f,pale)
+    val remark=record.remarks.ifBlank{"No remarks recorded for this assessment."}
+    t(remark.take(95),left+12f,remarksTop+34f,10f,false,Color.DKGRAY)
+    t("Attendance and fee information are available in the full student progress report.",left+12f,remarksTop+57f,8f,false,muted)
+
+    val footer=remarksTop+122f
+    line(left,footer,right,footer,Color.LTGRAY)
+    t("Prepared by ${profile.teacherName}",left,footer+25f,10f,true,navy)
+    t("${profile.qualification}  •  Contact: ${profile.phone}",left,footer+43f,8.5f,false,muted)
+    t("Computer-generated academic progress report",left,footer+63f,8f,false,muted)
     doc.finishPage(page)
     val dir=File(context.cacheDir,"reports").apply{mkdirs()}; val file=File(dir,"${student.name.replace(Regex("[^A-Za-z0-9_-]"),"_")}_Progress_${record.date.replace('/','-')}.pdf"); file.outputStream().use{doc.writeTo(it)}; doc.close(); return FileProvider.getUriForFile(context,"${context.packageName}.fileprovider",file)
 }
@@ -3831,7 +3971,21 @@ fun createReportPdf(
     }
     fun line(y: Float) {
         paint.style = Paint.Style.STROKE
+        paint.color = Color.LTGRAY
+        paint.strokeWidth = 1f
         canvas.drawLine(45f, y, 550f, y, paint)
+        paint.style = Paint.Style.FILL
+    }
+    fun fill(l: Float, top: Float, r: Float, bottom: Float, color: Int) {
+        paint.style = Paint.Style.FILL
+        paint.color = color
+        canvas.drawRect(l, top, r, bottom, paint)
+    }
+    fun vertical(x: Float, top: Float, bottom: Float, color: Int = Color.LTGRAY) {
+        paint.style = Paint.Style.STROKE
+        paint.color = color
+        paint.strokeWidth = 1f
+        canvas.drawLine(x, top, x, bottom, paint)
         paint.style = Paint.Style.FILL
     }
 
@@ -3846,54 +4000,64 @@ fun createReportPdf(
         val studentAttendance = attendance.filter { it.studentId == s.id }
         val paidTotal = payments.filter { it.studentId == s.id }.sumOf { it.amount }
 
-        center("THE MATH GUIDE", 55f, 25f, true)
-        center("STUDENT PROGRESS REPORT", 82f, 16f, true)
-        center(s.name, 105f, 15f, true)
-        line(122f)
-
-        t("STUDENT DETAILS", 45f, 150f, 13f, true)
-        t("Class", 60f, 178f, 10f); t(s.className, 300f, 178f, 10f, true)
-        t("Batch", 60f, 201f, 10f); t(s.batch.ifBlank { "—" }, 300f, 201f, 10f, true)
-        t("Joining month", 60f, 224f, 10f); t(s.joiningMonth.ifBlank { "Not provided" }, 300f, 224f, 10f, true)
-        t("Monthly fee", 60f, 247f, 10f); t("₹${s.monthlyFee}", 300f, 247f, 10f, true)
-        t("Total fees paid", 60f, 270f, 10f); t("₹$paidTotal", 300f, 270f, 10f, true)
-
         val present = studentAttendance.count { it.status == "PRESENT" }
         val absent = studentAttendance.count { it.status == "ABSENT" }
         val late = studentAttendance.count { it.status == "LATE" }
         val marked = present + absent + late
         val attendanceRate = if (marked > 0) ((present.toFloat() / marked) * 100).roundToInt() else 0
 
-        line(292f)
-        t("ATTENDANCE", 45f, 318f, 13f, true)
-        t("Present", 60f, 346f, 10f); t(present.toString(), 300f, 346f, 10f, true)
-        t("Absent", 60f, 369f, 10f); t(absent.toString(), 300f, 369f, 10f, true)
-        t("Late", 60f, 392f, 10f); t(late.toString(), 300f, 392f, 10f, true)
-        t("Attendance rate", 60f, 415f, 10f); t("$attendanceRate%", 300f, 415f, 10f, true)
-
-        line(437f)
-        t("ACADEMIC PERFORMANCE", 45f, 463f, 13f, true)
-
         val validAcademic = studentAcademic.filter { it.maxMarks > 0 }
         val totalMarks = validAcademic.sumOf { it.marks }
         val totalMax = validAcademic.sumOf { it.maxMarks }
         val average = if (totalMax > 0) ((totalMarks / totalMax) * 100).roundToInt() else 0
-        t("Overall average", 60f, 491f, 10f); t("$average%", 300f, 491f, 10f, true)
-        t("Tests / exams", 60f, 514f, 10f); t(validAcademic.size.toString(), 300f, 514f, 10f, true)
 
-        var py = 545f
-        studentAcademic.sortedByDescending { it.date }.take(10).forEach { r ->
-            val pct = if (r.maxMarks > 0) ((r.marks / r.maxMarks) * 100).roundToInt() else 0
-            val label = "${r.subject.ifBlank { "Subject" }} • ${r.title.ifBlank { "Test" }}"
-            t(label, 60f, py, 9f)
-            t("${r.marks.toCleanNumber()}/${r.maxMarks.toCleanNumber()} ($pct%)", 380f, py, 9f, true)
-            py += 20f
+        val navy = Color.rgb(24, 43, 74)
+        val paleBlue = Color.rgb(237, 243, 251)
+        val muted = Color.rgb(92, 103, 118)
+        fill(42f, 30f, 553f, 108f, navy)
+        paint.color = Color.WHITE
+        center("THE MATH GUIDE", 57f, 21f, true)
+        center("STUDENT PROGRESS REPORT", 80f, 11f, true)
+        center(s.name.take(48), 98f, 10f)
+
+        paint.color = navy
+        t("STUDENT DETAILS", 45f, 133f, 10f, true)
+        fill(45f, 143f, 550f, 205f, Color.WHITE)
+        line(143f); line(174f); line(205f); vertical(298f, 143f, 205f)
+        paint.color = muted; t("CLASS", 57f, 157f, 7.5f, true); t("BATCH", 310f, 157f, 7.5f, true)
+        paint.color = navy; t(s.className.ifBlank { "—" }, 57f, 170f, 10f, true); t(s.batch.ifBlank { "—" }, 310f, 170f, 10f, true)
+        paint.color = muted; t("JOINING MONTH", 57f, 188f, 7.5f, true); t("MONTHLY FEE / PAID", 310f, 188f, 7.5f, true)
+        paint.color = navy; t(s.joiningMonth.ifBlank { "Not provided" }, 57f, 201f, 10f, true); t("₹${s.monthlyFee}  /  ₹$paidTotal", 310f, 201f, 10f, true)
+
+        fill(45f, 226f, 550f, 276f, paleBlue)
+        paint.color = muted; t("ATTENDANCE", 57f, 243f, 7.5f, true); t("ACADEMIC AVERAGE", 184f, 243f, 7.5f, true); t("ASSESSMENTS", 334f, 243f, 7.5f, true); t("FEES PAID", 455f, 243f, 7.5f, true)
+        paint.color = navy; t("$attendanceRate%", 57f, 263f, 15f, true); t("$average%", 184f, 263f, 15f, true); t(validAcademic.size.toString(), 334f, 263f, 15f, true); t("₹$paidTotal", 455f, 263f, 15f, true)
+
+        paint.color = navy; t("ACADEMIC PERFORMANCE", 45f, 302f, 10f, true)
+        fill(45f, 312f, 550f, 337f, navy)
+        paint.color = Color.WHITE; t("DATE", 55f, 329f, 7.5f, true); t("SUBJECT", 120f, 329f, 7.5f, true); t("ASSESSMENT", 215f, 329f, 7.5f, true); t("MARKS", 360f, 329f, 7.5f, true); t("%", 435f, 329f, 7.5f, true); t("REMARKS", 475f, 329f, 7.5f, true)
+        val results = validAcademic.sortedByDescending { it.date }.take(7)
+        results.forEachIndexed { index, r ->
+            val top = 337f + index * 28f
+            if (index % 2 == 0) fill(45f, top, 550f, top + 28f, Color.rgb(249, 250, 252))
+            line(top + 28f)
+            val pct = ((r.marks / r.maxMarks) * 100).roundToInt()
+            paint.color = Color.DKGRAY
+            t(r.date, 55f, top + 18f, 8.5f); t(r.subject.ifBlank { "—" }.take(15), 120f, top + 18f, 8.5f, true); t(r.title.ifBlank { "Test" }.take(23), 215f, top + 18f, 8.5f); t("${r.marks.toCleanNumber()}/${r.maxMarks.toCleanNumber()}", 360f, top + 18f, 8.5f, true); t("$pct%", 435f, top + 18f, 8.5f, true); t(r.remarks.ifBlank { "—" }.take(14), 475f, top + 18f, 8f)
         }
+        val tableBottom = 337f + maxOf(1, results.size) * 28f
+        line(312f); line(tableBottom); vertical(45f, 312f, tableBottom); vertical(550f, 312f, tableBottom)
 
-        line(760f)
-        t("Prepared by Ashraful Hoque • B.SC Maths", 45f, 785f, 9f, true)
-        t("The Math Guide • 9732956571", 45f, 802f, 9f)
-        center("Computer-generated student progress report", 823f, 8f)
+        val attendanceTop = tableBottom + 30f
+        paint.color = navy; t("ATTENDANCE SUMMARY", 45f, attendanceTop, 10f, true)
+        fill(45f, attendanceTop + 10f, 550f, attendanceTop + 47f, paleBlue)
+        paint.color = muted; t("PRESENT", 58f, attendanceTop + 25f, 7.5f, true); t("ABSENT", 175f, attendanceTop + 25f, 7.5f, true); t("LATE", 290f, attendanceTop + 25f, 7.5f, true); t("TOTAL MARKED", 390f, attendanceTop + 25f, 7.5f, true)
+        paint.color = navy; t(present.toString(), 58f, attendanceTop + 42f, 12f, true); t(absent.toString(), 175f, attendanceTop + 42f, 12f, true); t(late.toString(), 290f, attendanceTop + 42f, 12f, true); t(marked.toString(), 390f, attendanceTop + 42f, 12f, true)
+
+        val footer = maxOf(attendanceTop + 82f, 735f)
+        line(footer)
+        paint.color = navy; t("Prepared by Ashraful Hoque • B.SC Maths", 45f, footer + 23f, 9f, true)
+        paint.color = muted; t("The Math Guide • 9732956571 • Computer-generated student progress report", 45f, footer + 41f, 8f)
 
         doc.finishPage(page)
         val dir = File(context.cacheDir, "reports").apply { mkdirs() }
