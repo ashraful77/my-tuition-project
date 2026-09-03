@@ -1,0 +1,131 @@
+name: Extract Green Features
+
+on:
+  push:
+    branches: ["refactor/student-card-v47"]
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    if: ${{ !contains(github.event.head_commit.message, 'Extract green features') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Extract independent UI features
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          src_path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          text = src_path.read_text(encoding='utf-8')
+
+          targets = {
+              'ReportsDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/reports/ReportsDialog.kt',
+              'BatchManagerDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/BatchManagerDialog.kt',
+              'LiveBatchDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/LiveBatchDialog.kt',
+              'TodayWorkDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/TodayWorkDialog.kt',
+              'ReceiptHistoryDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/receipts/ReceiptHistoryDialog.kt',
+              'StudentEditorDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/students/StudentEditorDialog.kt',
+              'StudentDetailsDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/students/StudentDetailsDialog.kt',
+          }
+
+          def find_function(source, name):
+              pat = re.compile(r'(?m)^(?:@Composable\s*\n)?fun\s+' + re.escape(name) + r'\s*\(')
+              m = pat.search(source)
+              if not m:
+                  raise SystemExit(f'Missing target function: {name}')
+              start = m.start()
+              brace = source.find('{', m.end())
+              if brace < 0:
+                  raise SystemExit(f'No opening brace for {name}')
+
+              depth = 0
+              i = brace
+              state = 'normal'
+              while i < len(source):
+                  c = source[i]
+                  n = source[i+1] if i + 1 < len(source) else ''
+                  if state == 'normal':
+                      if c == '"':
+                          if i + 2 < len(source) and source[i:i+3] == '"""':
+                              state = 'triple'; i += 3; continue
+                          state = 'string'; i += 1; continue
+                      if c == '/' and n == '/':
+                          state = 'line'; i += 2; continue
+                      if c == '/' and n == '*':
+                          state = 'block'; i += 2; continue
+                      if c == '{': depth += 1
+                      elif c == '}':
+                          depth -= 1
+                          if depth == 0:
+                              return start, i + 1
+                      i += 1
+                  elif state == 'string':
+                      if c == '\\': i += 2; continue
+                      if c == '"': state = 'normal'
+                      i += 1
+                  elif state == 'triple':
+                      if source[i:i+3] == '"""':
+                          state = 'normal'; i += 3
+                      else: i += 1
+                  elif state == 'line':
+                      if c == '\n': state = 'normal'
+                      i += 1
+                  else:
+                      if c == '*' and n == '/': state = 'normal'; i += 2
+                      else: i += 1
+              raise SystemExit(f'Unclosed function: {name}')
+
+          extracted = []
+          for name, out in targets.items():
+              start, end = find_function(text, name)
+              body = text[start:end].strip() + '\n'
+              header = '''package com.themathguild.mytuitionmanager
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.themathguild.mytuitionmanager.receipts.*
+import java.text.SimpleDateFormat
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.*
+
+'''
+              Path(out).parent.mkdir(parents=True, exist_ok=True)
+              Path(out).write_text(header + body, encoding='utf-8')
+              extracted.append((start, end, name))
+
+          # Remove extracted declarations from the original file, from the end backward.
+          for start, end, name in sorted(extracted, reverse=True):
+              text = text[:start] + text[end:]
+          src_path.write_text(text, encoding='utf-8')
+          print('Extracted:', ', '.join(targets))
+
+      - name: Build after extraction
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/refactor-green-features.yml
+          git add app/src/main/java/com/themathguild/mytuitionmanager .github/workflows/refactor-green-features.yml
+          git commit -m "Extract green features into focused files" || exit 0
+          git push origin HEAD:refactor/student-card-v47
