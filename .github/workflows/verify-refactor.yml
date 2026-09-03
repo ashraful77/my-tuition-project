@@ -15,7 +15,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+      - name: Check Gradle project files
+        run: |
+          ls -la
+          find . -maxdepth 3 -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
