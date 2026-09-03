@@ -6,128 +6,18 @@ on:
       - refactor/student-card-v47
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: refactor/student-card-v47
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Extract green features
-        shell: bash
+      - name: Check Gradle project files
         run: |
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-
-          src = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
-          text = src.read_text(encoding='utf-8')
-          targets = {
-              'ReportsDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/reports/ReportsDialog.kt',
-              'BatchManagerDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/BatchManagerDialog.kt',
-              'LiveBatchDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/LiveBatchDialog.kt',
-              'TodayWorkDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/batches/TodayWorkDialog.kt',
-              'ReceiptHistoryDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/receipts/ReceiptHistoryDialog.kt',
-              'StudentEditorDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/students/StudentEditorDialog.kt',
-              'StudentDetailsDialog': 'app/src/main/java/com/themathguild/mytuitionmanager/students/StudentDetailsDialog.kt',
-          }
-
-          def extract(source, name):
-              m = re.search(r'(?m)^(?:@Composable\s*\n)?fun\s+' + re.escape(name) + r'\s*\(', source)
-              if not m:
-                  raise RuntimeError(f'Missing target: {name}')
-              start = m.start()
-              brace = source.find('{', m.end())
-              if brace < 0:
-                  raise RuntimeError(f'No opening brace: {name}')
-              depth = 0
-              i = brace
-              state = 'normal'
-              while i < len(source):
-                  c = source[i]
-                  n = source[i+1] if i + 1 < len(source) else ''
-                  if state == 'normal':
-                      if c == '"':
-                          if source[i:i+3] == '"""': state = 'triple'; i += 3; continue
-                          state = 'string'; i += 1; continue
-                      if c == '/' and n == '/': state = 'line'; i += 2; continue
-                      if c == '/' and n == '*': state = 'block'; i += 2; continue
-                      if c == '{': depth += 1
-                      elif c == '}':
-                          depth -= 1
-                          if depth == 0: return start, i + 1
-                      i += 1
-                  elif state == 'string':
-                      if c == '\\': i += 2; continue
-                      if c == '"': state = 'normal'
-                      i += 1
-                  elif state == 'triple':
-                      if source[i:i+3] == '"""': state = 'normal'; i += 3
-                      else: i += 1
-                  elif state == 'line':
-                      if c == '\n': state = 'normal'
-                      i += 1
-                  else:
-                      if c == '*' and n == '/': state = 'normal'; i += 2
-                      else: i += 1
-              raise RuntimeError(f'Unclosed target: {name}')
-
-          header = '''package com.themathguild.mytuitionmanager
-
-import android.net.Uri
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import com.themathguild.mytuitionmanager.receipts.*
-import java.text.SimpleDateFormat
-import java.time.LocalDate
-import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.*
-
-'''
-          spans = []
-          for name, out in targets.items():
-              a, b = extract(text, name)
-              p = Path(out)
-              p.parent.mkdir(parents=True, exist_ok=True)
-              p.write_text(header + text[a:b].strip() + '\n', encoding='utf-8')
-              spans.append((a, b, name))
-          for a, b, _ in sorted(spans, reverse=True):
-              text = text[:a] + text[b:]
-          text = text.replace('private fun recentMonths(', 'fun recentMonths(')
-          text = text.replace('private fun FullScreenPage(', 'fun FullScreenPage(')
-          src.write_text(text, encoding='utf-8')
-          print('Extracted:', ', '.join(targets))
-          PY
+          ls -la
+          find . -maxdepth 3 -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
-      - name: Commit extracted source and restore workflow
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/refactor/student-card-v47' && !contains(github.event.head_commit.message, 'Extract green features') }}
-        run: |
-          git checkout -- .github/workflows/verify-refactor.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/com/themathguild/mytuitionmanager .github/workflows/verify-refactor.yml
-          git commit -m "Extract green features into focused files"
-          git push origin HEAD:refactor/student-card-v47
