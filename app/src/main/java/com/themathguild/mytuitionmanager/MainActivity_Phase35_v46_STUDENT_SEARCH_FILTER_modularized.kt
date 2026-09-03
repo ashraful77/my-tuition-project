@@ -54,6 +54,7 @@ import java.util.*
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color as ComposeColor
 import com.themathguild.mytuitionmanager.components.StudentCard
+import com.themathguild.mytuitionmanager.dailyspent.DailySpentScreen
 
 data class Student(
     val id: Long,
@@ -182,7 +183,7 @@ fun validateFeeCollection(
     return null
 }
 
-private const val BACKUP_FORMAT_VERSION = 7
+private const val BACKUP_FORMAT_VERSION = 8
 
 fun validateBackupData(obj: JSONObject): String? {
     if (obj.optString("app") != "The Math Guide") return "This is not a The Math Guide backup."
@@ -192,6 +193,7 @@ fun validateBackupData(obj: JSONObject): String? {
     val payments = obj.optJSONArray("payments") ?: return "Payment data is missing."
     val attendance = obj.optJSONArray("attendance") ?: JSONArray()
     val academic = obj.optJSONArray("academicRecords") ?: JSONArray()
+    val dailySpent = obj.optJSONArray("dailySpent") ?: JSONArray()
 
     val studentIds = mutableSetOf<Long>()
     for (i in 0 until students.length()) {
@@ -228,6 +230,11 @@ fun validateBackupData(obj: JSONObject): String? {
         val max = a.optDouble("maxMarks", -1.0)
         if (marks < 0 || max <= 0 || marks > max) return "Invalid academic marks."
     }
+    for (i in 0 until dailySpent.length()) {
+        val d = dailySpent.optJSONObject(i) ?: return "Invalid daily spent record."
+        if (!d.has("id") || !d.has("date") || !d.has("description") || !d.has("amount")) return "Invalid daily spent record."
+        if (d.optString("date").isBlank() || d.optString("description").isBlank() || d.optInt("amount", -1) <= 0) return "Invalid daily spent record."
+    }
     return null
 }
 
@@ -252,6 +259,7 @@ fun exportBackup(context: Context): Uri {
     val batchNotes = JSONArray(prefs.getString("batchNotes", "[]") ?: "[]")
     val batches = JSONArray(prefs.getString("batches", "[]") ?: "[]")
     val library = JSONArray(prefs.getString("library", "[]") ?: "[]")
+    val dailySpent = JSONArray(prefs.getString("dailySpent", "[]") ?: "[]")
 
     val json = JSONObject().apply {
         put("app", "The Math Guide")
@@ -269,6 +277,8 @@ fun exportBackup(context: Context): Uri {
         put("batchNotes", batchNotes)
         put("batches", batches)
         put("library", library)
+        put("dailySpent", dailySpent)
+        put("dailySpentCount", dailySpent.length())
         put("tuitionProfile", profile)
     }.toString(2)
 
@@ -297,6 +307,7 @@ fun importBackup(context: Context, uri: Uri): Boolean {
         val batchNotes = obj.optJSONArray("batchNotes") ?: JSONArray()
         val batches = obj.optJSONArray("batches") ?: JSONArray()
         val library = obj.optJSONArray("library") ?: JSONArray()
+        val dailySpent = obj.optJSONArray("dailySpent") ?: JSONArray()
 
         if (validateBackupData(obj) != null) return false
 
@@ -310,6 +321,7 @@ fun importBackup(context: Context, uri: Uri): Boolean {
             .putString("batchNotes", batchNotes.toString())
             .putString("batches", batches.toString())
             .putString("library", library.toString())
+            .putString("dailySpent", dailySpent.toString())
 
         obj.optJSONObject("tuitionProfile")?.let { profile ->
             editor.putString("tuitionName", profile.optString("tuitionName", "The Math Guide"))
@@ -376,6 +388,7 @@ fun TuitionApp(store: LocalStore) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var students by remember { mutableStateOf(store.loadStudents()) }
     var payments by remember { mutableStateOf(store.loadPayments()) }
+    var dailySpent by remember { mutableStateOf(store.loadDailySpent()) }
     var attendance by remember { mutableStateOf(store.loadAttendance()) }
     var academicRecords by remember { mutableStateOf(store.loadAcademicRecords()) }
     var tuitionProfile by remember { mutableStateOf(store.loadTuitionProfile()) }
@@ -537,7 +550,8 @@ fun TuitionApp(store: LocalStore) {
                     NavigationBarItem(selected = selectedBottomTab == 1, onClick = { navigateToTab(1) }, icon = { Text("☷") }, label = { Text("Students") })
                     NavigationBarItem(selected = selectedBottomTab == 2, onClick = { navigateToTab(2) }, icon = { Text("🎓") }, label = { Text("Live Batch") })
                     NavigationBarItem(selected = selectedBottomTab == 3, onClick = { navigateToTab(3) }, icon = { Text("₹") }, label = { Text("Payments") })
-                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("⚙") }, label = { Text("Settings") })
+                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("🧾") }, label = { Text("Daily Spent") })
+                    NavigationBarItem(selected = selectedBottomTab == 5, onClick = { navigateToTab(5) }, icon = { Text("⚙") }, label = { Text("Settings") })
                 }
             }
         ) { padding ->
@@ -659,7 +673,29 @@ fun TuitionApp(store: LocalStore) {
             }
         }
 
-        if (selectedBottomTab == 4) SettingsDialog(
+        if (selectedBottomTab == 4) DailySpentScreen(
+            expenses = dailySpent,
+            onAdd = { description, amount ->
+                guarded("dailySpent", "Add Daily Spent") {
+                    dailySpent = dailySpent + DailySpent(System.currentTimeMillis(), currentDate(), description, amount)
+                    store.saveDailySpent(dailySpent)
+                }
+            },
+            onEdit = { expense, description, amount ->
+                guarded("dailySpent", "Edit Daily Spent") {
+                    dailySpent = dailySpent.map { if (it.id == expense.id) it.copy(description = description, amount = amount) else it }
+                    store.saveDailySpent(dailySpent)
+                }
+            },
+            onDelete = { expense ->
+                guarded("dailySpent", "Delete Daily Spent") {
+                    dailySpent = dailySpent.filterNot { it.id == expense.id }
+                    store.saveDailySpent(dailySpent)
+                }
+            }
+        )
+
+        if (selectedBottomTab == 5) SettingsDialog(
             onDismiss = { selectedBottomTab = 0 },
             onAdd = { selectedBottomTab = 0; guarded("addStudent", "Add Student") { addOpen = true } },
             onManage = { selectedBottomTab = 1 },
@@ -919,6 +955,7 @@ fun TuitionApp(store: LocalStore) {
                             if (ok) {
                                 students = store.loadStudents()
                                 payments = store.loadPayments()
+                                dailySpent = store.loadDailySpent()
                                 attendance = store.loadAttendance()
                                 academicRecords = store.loadAcademicRecords()
                                 tuitionProfile = store.loadTuitionProfile()
@@ -1041,7 +1078,7 @@ fun ThemeDialog(mode:String, accent:String, onDismiss:()->Unit, onSave:(String,S
 
 @Composable
 fun SecurityControlsDialog(store:LocalStore,onDismiss:()->Unit){
-    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup")
+    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup","dailySpent" to "Daily Spent")
     AlertDialog(onDismissRequest=onDismiss,title={Text("Protected Actions")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
         Text("Choose which actions require your 4-digit PIN.",style=MaterialTheme.typography.bodySmall)
         items.forEach{(key,label)->var checked by remember{mutableStateOf(store.isProtected(key))};Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Switch(checked,{checked=it;store.setProtected(key,it)})}}

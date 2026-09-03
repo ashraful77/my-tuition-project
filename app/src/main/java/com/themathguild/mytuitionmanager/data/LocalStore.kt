@@ -12,6 +12,7 @@ import com.themathguild.mytuitionmanager.Batch
 import com.themathguild.mytuitionmanager.LibraryItem
 import com.themathguild.mytuitionmanager.BatchNote
 import com.themathguild.mytuitionmanager.TuitionProfile
+import com.themathguild.mytuitionmanager.DailySpent
 
 class LocalStore(context: Context) {
     private val prefs = context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
@@ -213,6 +214,28 @@ class LocalStore(context: Context) {
         val a = JSONArray()
         list.forEach { f -> a.put(JSONObject().apply { put("id", f.id); put("name", f.name); put("uri", f.uri); put("category", f.category); put("addedDate", f.addedDate) }) }
         prefs.edit().putString("library", a.toString()).apply()
+    }
+
+
+    fun loadDailySpent(): List<DailySpent> {
+        val a = JSONArray(prefs.getString("dailySpent", "[]"))
+        return List(a.length()) { i ->
+            val o = a.getJSONObject(i)
+            DailySpent(o.getLong("id"), o.optString("date"), o.optString("description"), o.optInt("amount", 0))
+        }
+    }
+
+    fun saveDailySpent(list: List<DailySpent>) {
+        val a = JSONArray()
+        list.forEach { item ->
+            a.put(JSONObject().apply {
+                put("id", item.id)
+                put("date", item.date)
+                put("description", item.description)
+                put("amount", item.amount)
+            })
+        }
+        prefs.edit().putString("dailySpent", a.toString()).apply()
     }
 
     fun themeMode(): String = prefs.getString("themeMode", "System") ?: "System"
