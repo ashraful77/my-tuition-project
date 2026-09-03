@@ -1,0 +1,100 @@
+name: Apply Attendance Refactor
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+          fetch-depth: 0
+
+      - name: Extract attendance dialog safely
+        shell: python
+        run: |
+          from pathlib import Path
+
+          main = Path("app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt")
+          text = main.read_text(encoding="utf-8")
+
+          start_marker = "@Composable\nfun AttendanceDialog("
+          end_marker = "\n\n\nfun shareAcademicResultWhatsApp"
+          if start_marker not in text or end_marker not in text:
+              raise SystemExit("AttendanceDialog boundaries not found")
+
+          # Extract the block BEFORE changing MainActivity, so all indices remain valid.
+          start = text.index(start_marker)
+          end = text.index(end_marker, start)
+          block = text[start:end]
+
+          target = Path("app/src/main/java/com/themathguild/mytuitionmanager/attendance/AttendanceDialog.kt")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          target.write_text(
+              "package com.themathguild.mytuitionmanager.attendance\n\n"
+              "import com.themathguild.mytuitionmanager.AttendanceRecord\n"
+              "import com.themathguild.mytuitionmanager.Student\n\n"
+              "import androidx.compose.foundation.horizontalScroll\n"
+              "import androidx.compose.foundation.layout.*\n"
+              "import androidx.compose.foundation.lazy.LazyColumn\n"
+              "import androidx.compose.foundation.lazy.items\n"
+              "import androidx.compose.foundation.rememberScrollState\n"
+              "import androidx.compose.material3.*\n"
+              "import androidx.compose.runtime.*\n"
+              "import androidx.compose.ui.Alignment\n"
+              "import androidx.compose.ui.Modifier\n"
+              "import androidx.compose.ui.text.font.FontWeight\n"
+              "import androidx.compose.ui.text.style.TextAlign\n"
+              "import androidx.compose.ui.unit.dp\n"
+              "import java.time.LocalDate\n"
+              "import java.time.format.DateTimeFormatter\n"
+              "import java.util.Locale\n\n" + block + "\n",
+              encoding="utf-8"
+          )
+
+          # Remove exactly the extracted block from MainActivity.
+          text = text[:start] + text[end:]
+
+          import_line = "import com.themathguild.mytuitionmanager.attendance.AttendanceDialog"
+          if import_line not in text:
+              package_line = "package com.themathguild.mytuitionmanager\n"
+              text = text.replace(package_line, package_line + "\n" + import_line + "\n", 1)
+
+          main.write_text(text, encoding="utf-8")
+
+          # Structural validation before committing.
+          main_text = main.read_text(encoding="utf-8")
+          target_text = target.read_text(encoding="utf-8")
+          if "fun AttendanceDialog(" in main_text:
+              raise SystemExit("AttendanceDialog still exists in MainActivity")
+          if "fun AttendanceDialog(" not in target_text:
+              raise SystemExit("AttendanceDialog missing from new file")
+          if "fun shareAcademicResultWhatsApp" not in main_text:
+              raise SystemExit("MainActivity boundary after AttendanceDialog is missing")
+
+          # The extracted block must have its complete closing structure.
+          if not target_text.rstrip().endswith("}"):
+              raise SystemExit("AttendanceDialog file does not end with a closing brace")
+
+          print(f"AttendanceDialog extracted: {len(block.encode('utf-8'))} bytes")
+          print(f"MainActivity: {len(main.read_bytes())} bytes")
+          print(f"AttendanceDialog.kt: {len(target.read_bytes())} bytes")
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/apply-attendance-refactor.yml
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt app/src/main/java/com/themathguild/mytuitionmanager/attendance/AttendanceDialog.kt .github/workflows/apply-attendance-refactor.yml
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "Refactor: extract attendance dialog"
+          git push origin HEAD:refactor/student-card-v47
