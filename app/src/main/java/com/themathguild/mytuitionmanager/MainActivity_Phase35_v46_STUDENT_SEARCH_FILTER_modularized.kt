@@ -675,9 +675,9 @@ fun TuitionApp(store: LocalStore) {
 
         if (selectedBottomTab == 4) DailySpentScreen(
             expenses = dailySpent,
-            onAdd = { description, amount ->
+            onAdd = { description, amount, date ->
                 guarded("dailySpent", "Add Daily Spent") {
-                    dailySpent = dailySpent + DailySpent(System.currentTimeMillis(), currentDate(), description, amount)
+                    dailySpent = dailySpent + DailySpent(System.currentTimeMillis(), date, description, amount)
                     store.saveDailySpent(dailySpent)
                 }
             },

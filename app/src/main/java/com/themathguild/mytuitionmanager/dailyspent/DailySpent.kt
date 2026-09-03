@@ -28,7 +28,7 @@ private fun parseDailySpentDate(value: String): LocalDate? = try {
 @Composable
 fun DailySpentScreen(
     expenses: List<DailySpent>,
-    onAdd: (String, Int) -> Unit,
+    onAdd: (String, Int, String) -> Unit,
     onEdit: (DailySpent, String, Int) -> Unit,
     onDelete: (DailySpent) -> Unit
 ) {
@@ -126,7 +126,7 @@ fun DailySpentScreen(
     }
 
     if (addOpen) {
-        DailySpentEditorDialog("Add Expense", null, dateText, { addOpen = false }) { description, amount -> onAdd(description, amount); addOpen = false }
+        DailySpentEditorDialog("Add Expense", null, dateText, { addOpen = false }) { description, amount -> onAdd(description, amount, dateText); addOpen = false }
     }
     editor?.let { expense ->
         DailySpentEditorDialog("Edit Expense", expense, expense.date, { editor = null }) { description, amount -> onEdit(expense, description, amount); editor = null }
