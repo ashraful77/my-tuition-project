@@ -22,26 +22,19 @@ jobs:
           python3 <<'PY'
           from pathlib import Path
           import re
-
           src = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
           out = Path('app/src/main/java/com/themathguild/mytuitionmanager/batch/BatchManager.kt')
           text = src.read_text()
           names = ['BatchManagerDialog', 'TodayWorkDialog', 'FullScreenPage', 'LiveBatchDialog']
           extracted = {}
-
           def find_function(s, name):
-              pattern = r'(?m)^@Composable\s+(?:private\s+)?fun\s+' + re.escape(name) + r'\b'
-              matches = list(re.finditer(pattern, s))
-              print(name, 'declarations:', len(matches))
-              if len(matches) != 1:
-                  raise SystemExit(f'{name}: expected exactly 1 declaration, found {len(matches)}')
-              start = matches[0].start()
-              brace = s.find('{', matches[0].end())
+              matches = list(re.finditer(r'(?m)^@Composable\s+(?:private\s+)?fun\s+' + re.escape(name) + r'\b', s))
+              if len(matches) != 1: raise SystemExit(f'{name}: expected 1 declaration, found {len(matches)}')
+              start = matches[0].start(); brace = s.find('{', matches[0].end())
               if brace < 0: raise SystemExit(f'{name}: opening brace not found')
-              depth = 0; in_string = False; escape = False; line_comment = False; block_comment = False
-              i = brace
+              depth = 0; in_string = False; escape = False; line_comment = False; block_comment = False; i = brace
               while i < len(s):
-                  c = s[i]; n = s[i + 1] if i + 1 < len(s) else ''
+                  c = s[i]; n = s[i+1] if i+1 < len(s) else ''
                   if line_comment:
                       if c == '\n': line_comment = False
                   elif block_comment:
@@ -57,24 +50,16 @@ jobs:
                       elif c == '{': depth += 1
                       elif c == '}':
                           depth -= 1
-                          if depth == 0: return start, i + 1
+                          if depth == 0: return start, i+1
                   i += 1
               raise SystemExit(f'{name}: unmatched braces')
-
-          print('FullScreenPage call/declaration occurrences:', len(re.findall(r'\bFullScreenPage\s*\(', text)))
           for name in names:
-              a, b = find_function(text, name)
-              extracted[name] = text[a:b]
-
-          ranges = sorted((find_function(text, n) for n in names), reverse=True)
-          for a, b in ranges:
-              text = text[:a] + text[b:]
-
+              a,b = find_function(text,name); extracted[name] = text[a:b]
+          ranges = sorted((find_function(text,n) for n in names), reverse=True)
+          for a,b in ranges: text = text[:a] + text[b:]
           marker = 'package com.themathguild.mytuitionmanager\n'
-          import_line = 'import com.themathguild.mytuitionmanager.batch.BatchManager\n'
-          if import_line not in text:
-              text = text.replace(marker, marker + '\n' + import_line, 1)
-
+          imp = 'import com.themathguild.mytuitionmanager.batch.BatchManager\n'
+          if imp not in text: text = text.replace(marker, marker + '\n' + imp, 1)
           header = '''package com.themathguild.mytuitionmanager.batch
 
           import androidx.compose.foundation.horizontalScroll
@@ -96,12 +81,9 @@ jobs:
           import java.util.Locale
 
           '''
-          body = '\n\n'.join(extracted[n] for n in ['BatchManagerDialog', 'TodayWorkDialog', 'FullScreenPage', 'LiveBatchDialog'])
-          out.parent.mkdir(parents=True, exist_ok=True)
-          out.write_text(header + body + '\n')
-          src.write_text(text)
-
-          print('Batch/Routine extraction completed successfully.')
+          body = '\n\n'.join(extracted[n] for n in names)
+          out.parent.mkdir(parents=True, exist_ok=True); out.write_text(header + body + '\n'); src.write_text(text)
+          print('Extraction complete; files prepared for commit.')
           PY
 
       - name: Verify extraction
@@ -115,11 +97,22 @@ jobs:
           ! grep -q '^@Composable.*fun BatchManagerDialog' app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
 
       - name: Commit extraction
+        shell: bash
         run: |
+          git status --short
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt app/src/main/java/com/themathguild/mytuitionmanager/batch/BatchManager.kt
+          git diff --cached --stat
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt app/src/main/java/com/themathguild/mytuitionmanager/batch/BatchManager.kt
-          git commit -m 'Refactor: extract Batch and Routine management'
+          if ! git commit -m 'Refactor: extract Batch and Routine management'; then
+            git status --short > batch-refactor-diagnostic.txt
+            git diff --cached --stat >> batch-refactor-diagnostic.txt || true
+            git log -1 --oneline >> batch-refactor-diagnostic.txt
+            git add batch-refactor-diagnostic.txt
+            git commit -m 'chore: record batch refactor diagnostic'
+            git push origin HEAD:refactor/student-card-v47
+            exit 1
+          fi
           git push origin HEAD:refactor/student-card-v47
 
       - name: Remove temporary workflow
