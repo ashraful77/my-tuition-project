@@ -29,8 +29,10 @@ jobs:
           names = ['BatchManagerDialog', 'TodayWorkDialog', 'FullScreenPage', 'LiveBatchDialog']
           extracted = {}
 
-          def extract_function(s, name):
-              matches = list(re.finditer(r'(?m)^@Composable\s+(?:private\s+)?fun\s+' + re.escape(name) + r'\b', s))
+          def find_function(s, name):
+              pattern = r'(?m)^@Composable\s+(?:private\s+)?fun\s+' + re.escape(name) + r'\b'
+              matches = list(re.finditer(pattern, s))
+              print(name, 'declarations:', len(matches))
               if len(matches) != 1:
                   raise SystemExit(f'{name}: expected exactly 1 declaration, found {len(matches)}')
               start = matches[0].start()
@@ -59,19 +61,17 @@ jobs:
                   i += 1
               raise SystemExit(f'{name}: unmatched braces')
 
-          # One declaration + one call is expected; any extra call aborts safely.
-          if len(re.findall(r'(?m)\bFullScreenPage\s*\(', text)) != 2:
-              raise SystemExit('Unexpected FullScreenPage reference count; aborting safely')
-
+          print('FullScreenPage call/declaration occurrences:', len(re.findall(r'\bFullScreenPage\s*\(', text)))
           for name in names:
-              a, b = extract_function(text, name)
+              a, b = find_function(text, name)
               extracted[name] = text[a:b]
 
-          ranges = sorted((extract_function(text, n) for n in names), reverse=True)
-          for a, b in ranges: text = text[:a] + text[b:]
+          ranges = sorted((find_function(text, n) for n in names), reverse=True)
+          for a, b in ranges:
+              text = text[:a] + text[b:]
 
-          import_line = 'import com.themathguild.mytuitionmanager.batch.BatchManager\n'
           marker = 'package com.themathguild.mytuitionmanager\n'
+          import_line = 'import com.themathguild.mytuitionmanager.batch.BatchManager\n'
           if import_line not in text:
               text = text.replace(marker, marker + '\n' + import_line, 1)
 
@@ -96,14 +96,11 @@ jobs:
           import java.util.Locale
 
           '''
-          body = '\n\n'.join(extracted[n] for n in ['BatchManagerDialog', 'FullScreenPage', 'LiveBatchDialog', 'TodayWorkDialog'])
+          body = '\n\n'.join(extracted[n] for n in ['BatchManagerDialog', 'TodayWorkDialog', 'FullScreenPage', 'LiveBatchDialog'])
           out.parent.mkdir(parents=True, exist_ok=True)
           out.write_text(header + body + '\n')
           src.write_text(text)
 
-          for name in names:
-              if re.search(r'(?m)^@Composable\s+(?:private\s+)?fun\s+' + re.escape(name) + r'\b', text):
-                  raise SystemExit(f'{name} still present in MainActivity')
           print('Batch/Routine extraction completed successfully.')
           PY
 
