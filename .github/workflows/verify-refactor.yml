@@ -1,6 +1,9 @@
 name: Verify Refactor Build
 
 on:
+  push:
+    branches:
+      - refactor/student-card-v47
   workflow_dispatch:
 
 jobs:
