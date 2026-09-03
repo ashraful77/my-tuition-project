@@ -39,12 +39,17 @@ fun DailySpentScreen(
 
     val date = parseDailySpentDate(selectedDate) ?: LocalDate.now()
     val dateText = date.format(dailySpentDateFormatter)
+    val todayText = currentDailySpentDate()
+    val isToday = dateText == todayText
     val dayExpenses = expenses.filter { it.date == dateText }.sortedByDescending { it.id }
     val total = dayExpenses.sumOf { it.amount }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = { addOpen = true }) { Text("+") }
+            FloatingActionButton(
+                onClick = { if (isToday) addOpen = true },
+                containerColor = if (isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+            ) { Text("+") }
         }
     ) { padding ->
         LazyColumn(
@@ -80,6 +85,17 @@ fun DailySpentScreen(
                             Text("₹$total", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                         }
                         Text("${dayExpenses.size} ${if (dayExpenses.size == 1) "expense" else "expenses"}")
+                    }
+                }
+            }
+            if (!isToday) {
+                item {
+                    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                        Text(
+                            "Historical date: viewing only. Add new spending from Today to keep the date entry accurate.",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
