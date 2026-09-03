@@ -492,10 +492,6 @@ fun TuitionApp(store: LocalStore) {
     var attendance by remember { mutableStateOf(store.loadAttendance()) }
     var academicRecords by remember { mutableStateOf(store.loadAcademicRecords()) }
     var tuitionProfile by remember { mutableStateOf(store.loadTuitionProfile()) }
-    var routines by remember { mutableStateOf(store.loadBatchRoutines()) }
-    var batchNotes by remember { mutableStateOf(store.loadBatchNotes()) }
-    var batches by remember { mutableStateOf(store.loadBatches()) }
-    var libraryItems by remember { mutableStateOf(store.loadLibrary()) }
     var search by remember { mutableStateOf("") }
     var selectedBatch by remember { mutableStateOf("All") }
     var paymentFilter by remember { mutableStateOf("All") }
@@ -528,67 +524,49 @@ fun TuitionApp(store: LocalStore) {
     var selectedBottomTab by remember { mutableStateOf(0) }
     var themeMode by remember { mutableStateOf(store.themeMode()) }
     var accentName by remember { mutableStateOf(store.accentName()) }
+    var routines by remember { mutableStateOf(store.loadBatchRoutines()) }
+    var batchNotes by remember { mutableStateOf(store.loadBatchNotes()) }
+    var batches by remember { mutableStateOf(store.loadBatches()) }
+    var libraryItems by remember { mutableStateOf(store.loadLibrary()) }
 
-    val batchesFromStudents = students.map { it.batch }.filter { it.isNotBlank() }.distinct().sorted()
-    val allBatchNames = (batches.map { it.name } + batchesFromStudents).distinct().sorted()
+    val allBatches = (students.map { it.batch }.filter { it.isNotBlank() } + batches.map { it.name }).distinct().sorted()
     val filteredStudents = students.filter { s ->
         val matchesSearch = search.isBlank() || s.name.contains(search,true) || s.phone.contains(search,true) || s.className.contains(search,true)
         val matchesBatch = selectedBatch == "All" || s.batch == selectedBatch
-        val paid = payments.filter { it.studentId == s.id }.filter { monthKey(it.month) == YearMonth.now() }.sumOf { it.amount }
-        val due = s.monthlyFee - paid
+        val currentPaid = payments.filter { it.studentId == s.id && monthKey(it.month) == YearMonth.now() }.sumOf { it.amount }
+        val due = s.monthlyFee - currentPaid
         val matchesPayment = when(paymentFilter){"Paid"->due<=0;"Due"->due>0;else->true}
         matchesSearch && matchesBatch && matchesPayment
     }
 
     MaterialTheme {
-        Scaffold(
-            bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(selectedBottomTab==0,{selectedBottomTab=0},icon={},label={Text("Home")})
-                    NavigationBarItem(selectedBottomTab==1,{selectedBottomTab=1},icon={},label={Text("Students")})
-                    NavigationBarItem(selectedBottomTab==2,{selectedBottomTab=2},icon={},label={Text("Live Batch")})
-                    NavigationBarItem(selectedBottomTab==3,{selectedBottomTab=3},icon={},label={Text("Academic")})
-                    NavigationBarItem(selectedBottomTab==4,{selectedBottomTab=4},icon={},label={Text("Settings")})
-                }
-            }
-        ) { padding ->
+        Scaffold(bottomBar={NavigationBar{
+            NavigationBarItem(selectedBottomTab==0,{selectedBottomTab=0},icon={},label={Text("Home")})
+            NavigationBarItem(selectedBottomTab==1,{selectedBottomTab=1},icon={},label={Text("Students")})
+            NavigationBarItem(selectedBottomTab==2,{selectedBottomTab=2},icon={},label={Text("Live Batch")})
+            NavigationBarItem(selectedBottomTab==3,{selectedBottomTab=3},icon={},label={Text("Academic")})
+            NavigationBarItem(selectedBottomTab==4,{selectedBottomTab=4},icon={},label={Text("Settings")})
+        }}) { padding ->
             Column(Modifier.padding(padding).fillMaxSize()) {
                 when(selectedBottomTab){
-                    0 -> HomeContent(students, payments, filteredStudents, search, {search=it}, selectedBatch, {selectedBatch=it}, paymentFilter, {paymentFilter=it}, allBatchNames, {selectedStudent=it}, {collectStudent=it}, {settingsOpen=true})
+                    0 -> HomeContent(students,payments,filteredStudents,search,{search=it},selectedBatch,{selectedBatch=it},paymentFilter,{paymentFilter=it},allBatches,{selectedStudent=it},{collectStudent=it},{settingsOpen=true})
                     1 -> StudentsContent(filteredStudents,{selectedStudent=it},{collectStudent=it})
                     2 -> LiveBatchDialog(routines,batchNotes,{selectedBottomTab=0},{updated->routines=updated;store.saveBatchRoutines(updated)},{updated->batchNotes=updated;store.saveBatchNotes(updated)})
-                    3 -> AcademicScreen(students, academicRecords, {academicRecords=it;store.saveAcademicRecords(it)})
+                    3 -> AcademicScreen(students,academicRecords,{academicRecords=it;store.saveAcademicRecords(it)})
                     4 -> SettingsScreen({settingsOpen=true},{tuitionProfileOpen=true},{themeOpen=true},{securityControlsOpen=true},{todayWorkOpen=true},{libraryOpen=true},{restoreConfirmOpen=true},{demoToolsOpen=true})
                 }
             }
         }
-
-        if(settingsOpen) SettingsDialog(
-            onDismiss={settingsOpen=false},
-            onAdd={settingsOpen=false;addOpen=true},
-            onManage={manageStudentsOpen=true},
-            onReports={settingsOpen=false;reportOpen=true},
-            onReceiptHistory={settingsOpen=false;receiptHistoryOpen=true},
-            onTuitionProfile={settingsOpen=false;tuitionProfileOpen=true},
-            onBackup={shareReceipt(context,exportBackup(context))},
-            onRestore={restoreConfirmOpen=true}
-        )
+        if(settingsOpen) SettingsDialog(onDismiss={settingsOpen=false},onAdd={settingsOpen=false;addOpen=true},onManage={manageStudentsOpen=true},onReports={settingsOpen=false;reportOpen=true},onReceiptHistory={settingsOpen=false;receiptHistoryOpen=true},onTuitionProfile={settingsOpen=false;tuitionProfileOpen=true},onBackup={shareReceipt(context,exportBackup(context))},onRestore={restoreConfirmOpen=true})
         if(manageStudentsOpen) ManageStudentsDialog(students,{manageStudentsOpen=false},{s->manageStudentsOpen=false;settingsOpen=false;editStudent=s},{s->students=students.filter{it.id!=s.id};payments=payments.filter{it.studentId!=s.id};store.saveStudents(students);store.savePayments(payments)})
         if(addOpen) StudentEditorDialog("Add Student",null,{addOpen=false}){s->students=students+s;store.saveStudents(students);addOpen=false}
         editStudent?.let{s->StudentEditorDialog("Edit Student",s,{editStudent=null}){u->students=students.map{if(it.id==u.id)u else it};store.saveStudents(students);editStudent=null}}
         selectedStudent?.let{s->StudentDetailsDialog(s,payments.filter{it.studentId==s.id},outstanding(s),{selectedStudent=null},{collectStudent=s;selectedStudent=null})}
-        collectStudent?.let{s->CollectFeeDialog(s,{collectStudent=null}){month,amount->
-            val payment=Payment(s.id,month,amount,currentDate())
-            val newPayments=payments+payment;payments=newPayments;store.savePayments(newPayments)
-            val receiptNo="TMG-${SimpleDateFormat("yyyy",Locale.getDefault()).format(Date())}-${newPayments.size.toString().padStart(5,'0')}"
-            receiptUri=createReceiptPdf(context,s,newPayments.filter{it.studentId==s.id},receiptNo,tuitionProfile);collectStudent=null
-        }}
+        collectStudent?.let{s->CollectFeeDialog(s,{collectStudent=null}){month,amount->val p=Payment(s.id,month,amount,currentDate());payments=payments+p;store.savePayments(payments);val no="TMG-${SimpleDateFormat("yyyy",Locale.getDefault()).format(Date())}-${payments.size.toString().padStart(5,'0')}";receiptUri=createReceiptPdf(context,s,listOf(p),no,tuitionProfile);collectStudent=null}}
         receiptUri?.let{uri->AlertDialog(onDismissRequest={receiptUri=null},title={Text("Payment Saved ✓")},text={Text("Your professional PDF receipt has been created.")},confirmButton={Button(onClick={shareReceipt(context,uri);receiptUri=null}){Text("Share PDF")}},dismissButton={TextButton(onClick={receiptUri=null}){Text("Close")}})}
         if(reportOpen) ReportsDialog(students,payments,{reportOpen=false})
         if(receiptHistoryOpen) ReceiptHistoryDialog(students,payments,{receiptHistoryOpen=false},{student,ps,no->selectedReceipt=student;selectedReceiptPayments=ps;selectedReceiptNo=no;receiptHistoryOpen=false})
-        selectedReceipt?.let{student->
-            AlertDialog(onDismissRequest={selectedReceipt=null},title={Text("Payment Receipt")},text={Text(paymentReceiptText(tuitionProfile,student,selectedReceiptPayments,selectedReceiptNo))},confirmButton={},dismissButton={Row{TextButton(onClick={shareReceiptText(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile,"WhatsApp");selectedReceipt=null}){Text("WhatsApp")};TextButton(onClick={shareReceiptText(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile,"SMS");selectedReceipt=null}){Text("SMS")};TextButton(onClick={shareReceipt(context,createReceiptPdf(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile));selectedReceipt=null}){Text("PDF / Other")}}})
-        }
+        selectedReceipt?.let{student->AlertDialog(onDismissRequest={selectedReceipt=null},title={Text("Payment Receipt")},text={Text(paymentReceiptText(tuitionProfile,student,selectedReceiptPayments,selectedReceiptNo))},confirmButton={},dismissButton={Row{TextButton(onClick={shareReceiptText(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile,"WhatsApp");selectedReceipt=null}){Text("WhatsApp")};TextButton(onClick={shareReceiptText(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile,"SMS");selectedReceipt=null}){Text("SMS")};TextButton(onClick={shareReceipt(context,createReceiptPdf(context,student,selectedReceiptPayments,selectedReceiptNo,tuitionProfile));selectedReceipt=null}){Text("PDF / Other")}}})}
         if(tuitionProfileOpen) TuitionProfileDialog(tuitionProfile,{tuitionProfileOpen=false}){tuitionProfile=it;store.saveTuitionProfile(it);tuitionProfileOpen=false}
         if(themeOpen) ThemeDialog(themeMode,accentName,{themeOpen=false}){m,a->themeMode=m;accentName=a;store.saveTheme(m,a)}
         if(securityControlsOpen) SecurityControlsDialog(store){securityControlsOpen=false}
