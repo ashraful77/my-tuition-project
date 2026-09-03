@@ -1,9 +1,8 @@
 package com.themathguild.mytuitionmanager.dailyspent
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,7 +25,6 @@ private fun parseDailySpentDate(value: String): LocalDate? = try {
     null
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DailySpentScreen(
     expenses: List<DailySpent>,
@@ -59,44 +57,24 @@ fun DailySpentScreen(
                     Text("Simple date-wise expense record", style = MaterialTheme.typography.bodySmall)
                 }
             }
-
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            TextButton(onClick = {
-                                selectedDate = date.minusDays(1).format(dailySpentDateFormatter)
-                            }) { Text("‹ Previous") }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { selectedDate = date.minusDays(1).format(dailySpentDateFormatter) }) { Text("‹ Previous") }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(dateText, fontWeight = FontWeight.Bold)
-                                Text(
-                                    date.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())),
-                                    style = MaterialTheme.typography.labelSmall
-                                )
+                                Text(date.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault())), style = MaterialTheme.typography.labelSmall)
                             }
-                            TextButton(onClick = {
-                                selectedDate = date.plusDays(1).format(dailySpentDateFormatter)
-                            }) { Text("Next ›") }
+                            TextButton(onClick = { selectedDate = date.plusDays(1).format(dailySpentDateFormatter) }) { Text("Next ›") }
                         }
-                        OutlinedButton(
-                            onClick = { selectedDate = currentDailySpentDate() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) { Text("Today") }
+                        OutlinedButton(onClick = { selectedDate = currentDailySpentDate() }, modifier = Modifier.fillMaxWidth()) { Text("Today") }
                     }
                 }
             }
-
             item {
                 Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column {
                             Text("Total spent", style = MaterialTheme.typography.labelMedium)
                             Text("₹$total", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
@@ -105,7 +83,6 @@ fun DailySpentScreen(
                     }
                 }
             }
-
             if (dayExpenses.isEmpty()) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
@@ -118,10 +95,7 @@ fun DailySpentScreen(
             } else {
                 items(dayExpenses, key = { it.id }) { expense ->
                     Card(Modifier.fillMaxWidth()) {
-                        Row(
-                            Modifier.fillMaxWidth().padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
                                 Text(expense.description, fontWeight = FontWeight.SemiBold)
                                 Text("$dateText • ₹${expense.amount}", style = MaterialTheme.typography.bodySmall)
@@ -136,25 +110,11 @@ fun DailySpentScreen(
     }
 
     if (addOpen) {
-        DailySpentEditorDialog(
-            title = "Add Expense",
-            initial = null,
-            date = dateText,
-            onDismiss = { addOpen = false },
-            onSave = { description, amount -> onAdd(description, amount); addOpen = false }
-        )
+        DailySpentEditorDialog("Add Expense", null, dateText, { addOpen = false }) { description, amount -> onAdd(description, amount); addOpen = false }
     }
-
     editor?.let { expense ->
-        DailySpentEditorDialog(
-            title = "Edit Expense",
-            initial = expense,
-            date = expense.date,
-            onDismiss = { editor = null },
-            onSave = { description, amount -> onEdit(expense, description, amount); editor = null }
-        )
+        DailySpentEditorDialog("Edit Expense", expense, expense.date, { editor = null }) { description, amount -> onEdit(expense, description, amount); editor = null }
     }
-
     deleteTarget?.let { expense ->
         AlertDialog(
             onDismissRequest = { deleteTarget = null },
@@ -167,50 +127,22 @@ fun DailySpentScreen(
 }
 
 @Composable
-private fun DailySpentEditorDialog(
-    title: String,
-    initial: DailySpent?,
-    date: String,
-    onDismiss: () -> Unit,
-    onSave: (String, Int) -> Unit
-) {
+private fun DailySpentEditorDialog(title: String, initial: DailySpent?, date: String, onDismiss: () -> Unit, onSave: (String, Int) -> Unit) {
     var description by remember { mutableStateOf(initial?.description ?: "") }
     var amount by remember { mutableStateOf(initial?.amount?.toString() ?: "") }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title, fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Date: $date", fontWeight = FontWeight.SemiBold)
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("What did you spend on?") },
-                    placeholder = { Text("e.g. Electricity, stationery, travel") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = amount,
-                    onValueChange = { amount = it.filter(Char::isDigit) },
-                    label = { Text("Amount") },
-                    leadingIcon = { Text("₹") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                OutlinedTextField(description, { description = it }, label = { Text("What did you spend on?") }, placeholder = { Text("e.g. Electricity, stationery, travel") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(amount, { amount = it.filter(Char::isDigit) }, label = { Text("Amount") }, leadingIcon = { Text("₹") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         },
-        confirmButton = {
-            Button(
-                enabled = description.isNotBlank() && (amount.toIntOrNull() ?: 0) > 0,
-                onClick = { onSave(description.trim(), amount.toInt()) }
-            ) { Text("Save") }
-        },
+        confirmButton = { Button(enabled = description.isNotBlank() && (amount.toIntOrNull() ?: 0) > 0, onClick = { onSave(description.trim(), amount.toInt()) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
 
-private fun currentDailySpentDate(): String =
-    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(java.util.Date())
+private fun currentDailySpentDate(): String = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(java.util.Date())
