@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   extract-academic:
-    if: ${{ !contains(github.event.head_commit.message, 'Refactor: extract AcademicRecords feature') }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
@@ -94,8 +93,6 @@ jobs:
 
           src.write_text(updated, encoding='utf-8')
 
-          # Structural safety checks: the feature exists only in the new file,
-          # while the call site remains in MainActivity.
           main = src.read_text(encoding='utf-8')
           academic = out.read_text(encoding='utf-8')
           if 'fun AcademicRecordsDialog(' in main:
@@ -104,7 +101,7 @@ jobs:
               raise SystemExit('createAcademicProgressPdf still exists in MainActivity')
           if 'fun shareAcademicResultWhatsApp(' in main:
               raise SystemExit('shareAcademicResultWhatsApp still exists in MainActivity')
-          if 'import com.themathguild.mytuitionmanager.academic.AcademicRecordsDialog' not in main:
+          if import_line not in main:
               raise SystemExit('AcademicRecordsDialog import missing from MainActivity')
           if 'fun AcademicRecordsDialog(' not in academic:
               raise SystemExit('AcademicRecordsDialog missing from new file')
@@ -123,7 +120,6 @@ jobs:
           git push origin HEAD:${GITHUB_REF_NAME}
 
       - name: Remove temporary workflow
-        if: success()
         run: |
           git rm .github/workflows/refactor-academic.yml
           git commit -m "chore: remove temporary academic refactor workflow"
