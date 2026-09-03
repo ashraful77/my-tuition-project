@@ -1,0 +1,52 @@
+name: Fix Academic Build
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+  workflow_dispatch:
+
+jobs:
+  fix:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.head_commit.message, 'chore: fix academic extraction build errors') == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply targeted fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          academic="app/src/main/java/com/themathguild/mytuitionmanager/academic/AcademicRecordsDialog.kt"
+          main="app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          academic = Path('app/src/main/java/com/themathguild/mytuitionmanager/academic/AcademicRecordsDialog.kt')
+          main = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+
+          a = academic.read_text()
+          a = a.replace('import androidx.compose.ui.text.input.KeyboardOptions', 'import androidx.compose.foundation.text.KeyboardOptions')
+          academic.write_text(a)
+
+          m = main.read_text()
+          if 'fun Double.toCleanNumber()' not in m:
+              m += '\n\nfun Double.toCleanNumber(): String = if (this % 1.0 == 0.0) this.toInt().toString() else String.format(java.util.Locale.US, "%.2f", this).trimEnd(\'0\').trimEnd(\'.\')\n'
+          main.write_text(m)
+          PY
+
+          grep -q 'import androidx.compose.foundation.text.KeyboardOptions' "$academic"
+          grep -q 'fun Double.toCleanNumber()' "$main"
+
+      - name: Commit targeted fixes and remove workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/academic/AcademicRecordsDialog.kt app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt .github/workflows/fix-academic-build.yml
+          git commit -m "chore: fix academic extraction build errors"
+          git rm .github/workflows/fix-academic-build.yml
+          git commit -m "chore: remove temporary academic fix workflow"
+          git push
