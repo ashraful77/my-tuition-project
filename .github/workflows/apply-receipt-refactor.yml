@@ -1,0 +1,65 @@
+name: Apply Receipt Refactor
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+          fetch-depth: 0
+
+      - name: Extract receipt logic
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt")
+          text = path.read_text(encoding="utf-8")
+
+          required = [
+              "import com.themathguild.mytuitionmanager.components.StudentCard",
+              "private fun legacyReceiptPdf(",
+              "private fun createReceiptPdf(",
+              "private const val BACKUP_FORMAT_VERSION",
+          ]
+          missing = [x for x in required if x not in text]
+          if missing:
+              raise SystemExit("Receipt refactor validation failed; missing: " + ", ".join(missing))
+
+          start = text.index("private fun legacyReceiptPdf(")
+          end = text.index("private const val BACKUP_FORMAT_VERSION", start)
+          text = text[:start] + text[end:]
+
+          receipt_import = "import com.themathguild.mytuitionmanager.receipts.*"
+          if receipt_import not in text:
+              package_line = "package com.themathguild.mytuitionmanager\n"
+              if package_line not in text:
+                  raise SystemExit("Package declaration not found")
+              text = text.replace(package_line, package_line + "\n" + receipt_import + "\n", 1)
+
+          if "private fun legacyReceiptPdf(" in text or "private fun createReceiptPdf(" in text:
+              raise SystemExit("Receipt functions were not fully removed")
+
+          path.write_text(text, encoding="utf-8")
+          print(f"Updated {path}: {len(text.encode('utf-8'))} bytes, {len(text.splitlines())} lines")
+
+      - name: Commit refactor
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/apply-receipt-refactor.yml
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt .github/workflows/apply-receipt-refactor.yml
+          git diff --cached --check
+          git diff --cached --stat
+          git commit -m "Refactor: extract receipt generation and sharing"
+          git push origin HEAD:refactor/student-card-v47
