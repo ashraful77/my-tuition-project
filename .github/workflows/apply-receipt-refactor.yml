@@ -29,7 +29,7 @@ jobs:
           required = [
               "import com.themathguild.mytuitionmanager.components.StudentCard",
               "private fun legacyReceiptPdf(",
-              "private fun createReceiptPdf(",
+              "fun createReceiptPdf(",
               "private const val BACKUP_FORMAT_VERSION",
           ]
           missing = [x for x in required if x not in text]
@@ -47,7 +47,7 @@ jobs:
                   raise SystemExit("Package declaration not found")
               text = text.replace(package_line, package_line + "\n" + receipt_import + "\n", 1)
 
-          if "private fun legacyReceiptPdf(" in text or "private fun createReceiptPdf(" in text:
+          if "private fun legacyReceiptPdf(" in text or "fun createReceiptPdf(" in text:
               raise SystemExit("Receipt functions were not fully removed")
 
           path.write_text(text, encoding="utf-8")
