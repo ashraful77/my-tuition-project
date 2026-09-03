@@ -53,9 +53,12 @@ fun StudentCard(
                 Column { Text("Monthly fee", style = MaterialTheme.typography.labelSmall); Text("₹${student.monthlyFee}", fontWeight = FontWeight.SemiBold) }
                 Column(horizontalAlignment = Alignment.End) { Text("Joined", style = MaterialTheme.typography.labelSmall); Text(student.joiningMonth.ifBlank { "—" }, fontWeight = FontWeight.SemiBold) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Due ₹$due", fontWeight = FontWeight.SemiBold)
-                Text(if (todayAttendance == null) "Today: Not marked" else "Today: ${todayAttendance.lowercase().replaceFirstChar { it.uppercase() }}", style = MaterialTheme.typography.bodySmall)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text(
+                    if (todayAttendance == null) "Today: Not marked"
+                    else "Today: ${todayAttendance.lowercase().replaceFirstChar { it.uppercase() }}",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
             if (student.phone.isNotBlank()) Text("☎ ${student.phone}", style = MaterialTheme.typography.bodySmall)
             if (isActiveTab) {
