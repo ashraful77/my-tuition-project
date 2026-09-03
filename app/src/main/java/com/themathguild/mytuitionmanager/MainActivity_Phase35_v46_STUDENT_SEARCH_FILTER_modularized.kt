@@ -3252,3 +3252,6 @@ fun ReportsDialog(
         )
     }
 }
+
+
+fun Double.toCleanNumber(): String = if (this % 1.0 == 0.0) this.toInt().toString() else String.format(java.util.Locale.US, "%.2f", this).trimEnd('0').trimEnd('.')
