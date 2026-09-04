@@ -12,7 +12,6 @@ import com.themathguild.mytuitionmanager.Payment
 import com.themathguild.mytuitionmanager.Student
 import com.themathguild.mytuitionmanager.StatusBadge
 import com.themathguild.mytuitionmanager.currentMonth
-import java.time.LocalDate
 
 @Composable
 fun StudentCard(
@@ -32,7 +31,6 @@ fun StudentCard(
         paid > 0 -> "PARTIAL"
         else -> "DUE"
     }
-    val todayAttendance = attendance.firstOrNull { it.studentId == student.id && it.date == LocalDate.now().toString() }?.status
 
     Card(onClick = { onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -53,12 +51,8 @@ fun StudentCard(
                 Column { Text("Monthly fee", style = MaterialTheme.typography.labelSmall); Text("₹${student.monthlyFee}", fontWeight = FontWeight.SemiBold) }
                 Column(horizontalAlignment = Alignment.End) { Text("Joined", style = MaterialTheme.typography.labelSmall); Text(student.joiningMonth.ifBlank { "—" }, fontWeight = FontWeight.SemiBold) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Text(
-                    if (todayAttendance == null) "Today: Not marked"
-                    else "Today: ${todayAttendance.lowercase().replaceFirstChar { it.uppercase() }}",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            Row(Modifier.fillMaxWidth()) {
+                Text("Tap card to see full profile", style = MaterialTheme.typography.bodySmall)
             }
             if (student.phone.isNotBlank()) Text("☎ ${student.phone}", style = MaterialTheme.typography.bodySmall)
             if (isActiveTab) {
@@ -70,7 +64,6 @@ fun StudentCard(
                 TextButton(onClick = { onEdit(student) }) { Text("Edit") }
                 TextButton(onClick = { onDelete(student) }) { Text("Delete") }
             }
-            Text("Tap card for full profile", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
