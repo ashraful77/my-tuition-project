@@ -1,0 +1,68 @@
+name: Fix contact picker build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Move contact picker after phone state declaration
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          text = path.read_text()
+
+          start_marker = '    val context = LocalContext.current\n'
+          button_marker = '    OutlinedButton(\n        onClick = {\n            phonePickerLauncher.launch(\n'
+          phone_marker = '    var phone by remember { mutableStateOf(initialStudent?.phone ?: "") }\n'
+
+          start = text.find(start_marker)
+          button = text.find(button_marker, start)
+          if start < 0 or button < 0:
+              raise SystemExit('Contact picker block not found')
+
+          # Find the end of the OutlinedButton block by locating its closing brace
+          # immediately before the next UI element. The generated block is known and
+          # is kept as an exact structural block here.
+          block_end_marker = '    }\n\n'
+          end = text.find(block_end_marker, button)
+          if end < 0:
+              raise SystemExit('Contact picker button end not found')
+          end += len(block_end_marker)
+
+          picker_block = text[start:end]
+          text = text[:start] + text[end:]
+
+          phone_pos = text.find(phone_marker)
+          if phone_pos < 0:
+              raise SystemExit('Phone state declaration not found')
+          insert_at = phone_pos + len(phone_marker)
+          text = text[:insert_at] + '\n' + picker_block + text[insert_at:]
+
+          path.write_text(text)
+          print('Contact picker moved after phone state declaration.')
+          PY
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git commit -m "Fix contact picker phone state scope"
+          git push origin refactor/student-card-v47
+
+      - name: Remove one-shot workflow
+        if: success()
+        run: |
+          git rm .github/workflows/fix-contact-picker-build.yml
+          git commit -m "Remove one-shot contact picker build fix workflow"
+          git push origin refactor/student-card-v47
