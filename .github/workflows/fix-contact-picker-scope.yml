@@ -28,11 +28,6 @@ jobs:
           if context_idx < 0:
               raise SystemExit('Contact picker context declaration not found')
 
-          launcher_idx = next((i for i in range(context_idx, min(context_idx + 3, len(lines))) if 'phonePickerLauncher' in lines[i]), -1)
-          if launcher_idx < 0:
-              raise SystemExit('Contact picker launcher declaration not found')
-
-          # Remove the complete launcher declaration by tracking braces.
           end_idx = context_idx
           balance = 0
           started = False
@@ -68,6 +63,6 @@ jobs:
           git commit -m 'Fix contact picker phone state scope'
           git push origin refactor/student-card-v47
 
-          git rm -f .github/workflows/run-contact-picker-fix.yml .github/workflows/fix-contact-picker-build.yml .github/workflows/fix-contact-picker-scope.yml .github/contact-fix-trigger.txt .github/contact-fix-trigger-2.txt .github/contact-fix-trigger-3.txt 2>/dev/null || true
+          git rm -f .github/workflows/run-contact-picker-fix.yml .github/workflows/fix-contact-picker-build.yml .github/workflows/fix-contact-picker-scope.yml .github/contact-fix-trigger.txt .github/contact-fix-trigger-2.txt .github/contact-fix-trigger-3.txt .github/contact-fix-trigger-final.txt 2>/dev/null || true
           git commit -m 'Remove temporary contact picker workflows' || true
           git push origin refactor/student-card-v47 || true
