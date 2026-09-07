@@ -1,0 +1,73 @@
+name: Fix contact picker scope
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor == 'ashraful77'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Move launcher below phone state
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
+
+          context_idx = next((i for i, line in enumerate(lines) if line.strip() == 'val context = LocalContext.current'), -1)
+          if context_idx < 0:
+              raise SystemExit('Contact picker context declaration not found')
+
+          launcher_idx = next((i for i in range(context_idx, min(context_idx + 3, len(lines))) if 'phonePickerLauncher' in lines[i]), -1)
+          if launcher_idx < 0:
+              raise SystemExit('Contact picker launcher declaration not found')
+
+          # Remove the complete launcher declaration by tracking braces.
+          end_idx = context_idx
+          balance = 0
+          started = False
+          while end_idx < len(lines):
+              line = lines[end_idx]
+              balance += line.count('{') - line.count('}')
+              if '{' in line:
+                  started = True
+              if started and balance == 0:
+                  end_idx += 1
+                  break
+              end_idx += 1
+          while end_idx < len(lines) and lines[end_idx].strip() == '':
+              end_idx += 1
+
+          launcher_lines = lines[context_idx:end_idx]
+          del lines[context_idx:end_idx]
+
+          phone_idx = next((i for i, line in enumerate(lines) if line.lstrip().startswith('var phone ')), -1)
+          if phone_idx < 0:
+              raise SystemExit('Phone state declaration not found')
+
+          lines[phone_idx + 1:phone_idx + 1] = ['\n'] + launcher_lines
+          path.write_text(''.join(lines), encoding='utf-8')
+          print('Contact picker launcher moved below phone state declaration.')
+          PY
+
+      - name: Commit source fix and clean up
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git commit -m 'Fix contact picker phone state scope'
+          git push origin refactor/student-card-v47
+
+          git rm -f .github/workflows/run-contact-picker-fix.yml .github/workflows/fix-contact-picker-build.yml .github/workflows/fix-contact-picker-scope.yml .github/contact-fix-trigger.txt .github/contact-fix-trigger-2.txt .github/contact-fix-trigger-3.txt 2>/dev/null || true
+          git commit -m 'Remove temporary contact picker workflows' || true
+          git push origin refactor/student-card-v47 || true
