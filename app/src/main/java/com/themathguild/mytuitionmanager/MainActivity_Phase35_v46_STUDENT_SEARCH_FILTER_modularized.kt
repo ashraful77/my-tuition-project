@@ -1868,7 +1868,10 @@ fun LibraryDialog(
     onAdd: () -> Unit,
     onDelete: (LibraryItem) -> Unit
 ) {
-    val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }
+    var search by remember { mutableStateOf("") }
+    val context = LocalContext.current
+
+    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }
     AlertDialog(onDismissRequest=onDismiss,title={Text("Tuition Library")},text={Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Save notes, PDFs, books and tuition documents on this phone.",style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalAlignment=Alignment.CenterVertically){OutlinedTextField(search,{search=it},label={Text("Search library")},singleLine=true,modifier=Modifier.weight(1f));Button(onClick=onAdd){Text("Add")}}
