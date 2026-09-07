@@ -10,7 +10,6 @@ permissions:
 
 jobs:
   fix:
-    if: github.actor == 'ashraful77' || github.actor == 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,25 +23,16 @@ jobs:
           from pathlib import Path
           path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
           s = path.read_text(encoding='utf-8')
-
-          marker = '''fun LibraryDialog(\n    items: List<LibraryItem>,\n    onDismiss: () -> Unit,\n    onAdd: () -> Unit,\n    onDelete: (LibraryItem) -> Unit\n) {'''
-          if marker not in s:
-              raise SystemExit('LibraryDialog declaration not found')
-
-          old = '''} {\n    val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }'''
-          replacement = '''} {\n    var search by remember { mutableStateOf(\"\") }\n    val context = LocalContext.current\n\n    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
-          if old in s:
-              s = s.replace(old, replacement, 1)
-          else:
-              old2 = '''} {\n    var search by remember { mutableStateOf(\"\") }\n    val context = LocalContext.current\n\n    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
-              if old2 not in s:
-                  raise SystemExit('LibraryDialog scope insertion point not found')
-
+          old = '''    val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }'''
+          new = '''    var search by remember { mutableStateOf(\"\") }\n    val context = LocalContext.current\n\n    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
+          if old not in s:
+              raise SystemExit('Expected LibraryDialog visible line not found')
+          s = s.replace(old, new, 1)
           path.write_text(s, encoding='utf-8')
-          print('LibraryDialog search/context scope fixed.')
+          print('LibraryDialog search and context declarations added.')
           PY
 
-      - name: Commit source fix and clean up temporary workflows
+      - name: Commit source fix and remove temporary workflows
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
