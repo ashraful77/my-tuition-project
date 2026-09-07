@@ -29,6 +29,7 @@ fun BatchManagerDialog(
     var showRoutineEditor by remember { mutableStateOf(false) }
     var editingRoutineId by remember { mutableStateOf<Long?>(null) }
     var selectedBatch by remember { mutableStateOf(localBatches.firstOrNull()?.name ?: "") }
+    var routineBatch by remember { mutableStateOf(localBatches.firstOrNull()?.name ?: "") }
     var routineDay by remember { mutableStateOf("Monday") }
     var routineStart by remember { mutableStateOf("") }
     var routineEnd by remember { mutableStateOf("") }
@@ -116,6 +117,7 @@ fun BatchManagerDialog(
                                 }
                                 TextButton(onClick = {
                                     editingRoutineId = routine?.id
+                                    routineBatch = selectedBatch
                                     routineDay = day
                                     routineStart = routine?.start ?: ""
                                     routineEnd = routine?.end ?: ""
@@ -173,9 +175,13 @@ fun BatchManagerDialog(
                         if (oldName != null && oldName != cleanName) {
                             localRoutines = localRoutines.map { if (it.batch == oldName) it.copy(batch = cleanName) else it }
                             if (selectedBatch == oldName) selectedBatch = cleanName
+                            if (routineBatch == oldName) routineBatch = cleanName
                             onRenameBatch(oldName, cleanName)
                         }
-                        if (editingBatchId == null) selectedBatch = cleanName
+                        if (editingBatchId == null) {
+                            selectedBatch = cleanName
+                            routineBatch = cleanName
+                        }
                         onSaveBatches(localBatches)
                         onSaveRoutines(localRoutines)
                         showBatchEditor = false
@@ -192,8 +198,8 @@ fun BatchManagerDialog(
             title = { Text(if (editingRoutineId == null) "Add Routine" else "Edit Routine") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Batch: $selectedBatch", fontWeight = FontWeight.SemiBold)
-                    Text("Day: $routineDay", style = MaterialTheme.typography.bodySmall)
+                    SimpleDropdownField("Batch", routineBatch, localBatches.map { it.name }) { routineBatch = it }
+                    SimpleDropdownField("Day", routineDay, routineDays) { routineDay = it }
                     OutlinedTextField(
                         value = routineStart,
                         onValueChange = { routineStart = it },
@@ -212,7 +218,7 @@ fun BatchManagerDialog(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val cleanBatch = selectedBatch.trim()
+                    val cleanBatch = routineBatch.trim()
                     val cleanDay = routineDay.trim()
                     val cleanStart = routineStart.trim()
                     val cleanEnd = routineEnd.trim()
@@ -252,6 +258,7 @@ fun BatchManagerDialog(
                     localBatches = localBatches.filterNot { it.id == batch.id }
                     localRoutines = localRoutines.filterNot { it.batch == batch.name }
                     if (selectedBatch == batch.name) selectedBatch = localBatches.firstOrNull()?.name ?: ""
+                    if (routineBatch == batch.name) routineBatch = localBatches.firstOrNull()?.name ?: ""
                     onSaveBatches(localBatches)
                     onSaveRoutines(localRoutines)
                     deleteBatchTarget = null
