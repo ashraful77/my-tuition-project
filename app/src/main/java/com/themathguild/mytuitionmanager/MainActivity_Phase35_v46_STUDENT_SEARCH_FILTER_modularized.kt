@@ -550,7 +550,6 @@ fun TuitionApp(store: LocalStore) {
                     NavigationBarItem(selected = selectedBottomTab == 1, onClick = { navigateToTab(1) }, icon = { Text("☷") }, label = { Text("Students") })
                     NavigationBarItem(selected = selectedBottomTab == 2, onClick = { navigateToTab(2) }, icon = { Text("🎓") }, label = { Text("Live Batch") })
                     NavigationBarItem(selected = selectedBottomTab == 3, onClick = { navigateToTab(3) }, icon = { Text("₹") }, label = { Text("Payments") })
-                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("🧾") }, label = { Text() })
                     NavigationBarItem(selected = selectedBottomTab == 5, onClick = { navigateToTab(5) }, icon = { Text("⚙") }, label = { Text("Settings") })
                 }
             }
@@ -673,29 +672,7 @@ fun TuitionApp(store: LocalStore) {
             }
         }
 
-        if (selectedBottomTab == 4) DailySpentScreen(
-            expenses = dailySpent,
-            onAdd = { description, amount, date ->
-                guarded("dailySpent", "Add Daily Spent") {
-                    dailySpent = dailySpent + DailySpent(System.currentTimeMillis(), date, description, amount)
-                    store.saveDailySpent(dailySpent)
-                }
-            },
-            onEdit = { expense, description, amount ->
-                guarded("dailySpent", "Edit Daily Spent") {
-                    dailySpent = dailySpent.map { if (it.id == expense.id) it.copy(description = description, amount = amount) else it }
-                    store.saveDailySpent(dailySpent)
-                }
-            },
-            onDelete = { expense ->
-                guarded("dailySpent", "Delete Daily Spent") {
-                    dailySpent = dailySpent.filterNot { it.id == expense.id }
-                    store.saveDailySpent(dailySpent)
-                }
-            }
-        )
-
-        if (selectedBottomTab == 5) SettingsDialog(
+        if (selectedBottomTab == 4) SettingsDialog(
             onDismiss = { selectedBottomTab = 0 },
             onAdd = { selectedBottomTab = 0; guarded("addStudent", "Add Student") { addOpen = true } },
             onManage = { selectedBottomTab = 1 },
@@ -1078,7 +1055,7 @@ fun ThemeDialog(mode:String, accent:String, onDismiss:()->Unit, onSave:(String,S
 
 @Composable
 fun SecurityControlsDialog(store:LocalStore,onDismiss:()->Unit){
-    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup","dailySpent" to)
+    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup")
     AlertDialog(onDismissRequest=onDismiss,title={Text("Protected Actions")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
         Text("Choose which actions require your 4-digit PIN.",style=MaterialTheme.typography.bodySmall)
         items.forEach{(key,label)->var checked by remember{mutableStateOf(store.isProtected(key))};Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Switch(checked,{checked=it;store.setProtected(key,it)})}}
