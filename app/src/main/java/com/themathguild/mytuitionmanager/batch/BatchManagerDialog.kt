@@ -296,6 +296,7 @@ fun BatchManagerDialog(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RoutineTimePickerDialog(
     title: String,
