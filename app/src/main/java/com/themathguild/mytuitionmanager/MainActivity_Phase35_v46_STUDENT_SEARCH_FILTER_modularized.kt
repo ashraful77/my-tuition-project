@@ -55,7 +55,6 @@ import java.util.*
 import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.Color as ComposeColor
 import com.themathguild.mytuitionmanager.components.StudentCard
-import com.themathguild.mytuitionmanager.dailyspent.DailySpentScreen
 
 data class Student(
     val id: Long,
@@ -551,7 +550,7 @@ fun TuitionApp(store: LocalStore) {
                     NavigationBarItem(selected = selectedBottomTab == 1, onClick = { navigateToTab(1) }, icon = { Text("☷") }, label = { Text("Students") })
                     NavigationBarItem(selected = selectedBottomTab == 2, onClick = { navigateToTab(2) }, icon = { Text("🎓") }, label = { Text("Live Batch") })
                     NavigationBarItem(selected = selectedBottomTab == 3, onClick = { navigateToTab(3) }, icon = { Text("₹") }, label = { Text("Payments") })
-                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("🧾") }, label = { Text("Daily Spent") })
+                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("🧾") }, label = { Text() })
                     NavigationBarItem(selected = selectedBottomTab == 5, onClick = { navigateToTab(5) }, icon = { Text("⚙") }, label = { Text("Settings") })
                 }
             }
@@ -1079,7 +1078,7 @@ fun ThemeDialog(mode:String, accent:String, onDismiss:()->Unit, onSave:(String,S
 
 @Composable
 fun SecurityControlsDialog(store:LocalStore,onDismiss:()->Unit){
-    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup","dailySpent" to "Daily Spent")
+    val items=listOf("payment" to "Make Payment","addStudent" to "Add Student","editStudent" to "Edit Student","deleteStudent" to "Delete Student","editPayment" to "Edit Payment","deletePayment" to "Delete Payment","attendance" to "Attendance","academic" to "Academic Records","profile" to "Tuition Profile","demo" to "Demo / Test Data","restore" to "Restore Backup","dailySpent" to)
     AlertDialog(onDismissRequest=onDismiss,title={Text("Protected Actions")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(5.dp)){
         Text("Choose which actions require your 4-digit PIN.",style=MaterialTheme.typography.bodySmall)
         items.forEach{(key,label)->var checked by remember{mutableStateOf(store.isProtected(key))};Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(label,Modifier.weight(1f));Switch(checked,{checked=it;store.setProtected(key,it)})}}
