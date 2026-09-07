@@ -1,0 +1,67 @@
+name: Run contact picker build fix
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+jobs:
+  fix:
+    if: github.actor == 'ashraful77' || github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Fix phone state scope
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          text = path.read_text()
+
+          start_marker = '    val context = LocalContext.current\n'
+          button_marker = '    OutlinedButton(\n        onClick = {\n            phonePickerLauncher.launch(\n'
+          phone_marker = '    var phone by remember { mutableStateOf(initialStudent?.phone ?: "") }\n'
+
+          start = text.find(start_marker)
+          button = text.find(button_marker, start)
+          if start < 0 or button < 0:
+              raise SystemExit('Contact picker block not found')
+
+          # The picker block ends at the blank line following the OutlinedButton.
+          end_marker = '    }\n\n'
+          end = text.find(end_marker, button)
+          if end < 0:
+              raise SystemExit('Contact picker block end not found')
+          end += len(end_marker)
+
+          picker_block = text[start:end]
+          text = text[:start] + text[end:]
+
+          phone_pos = text.find(phone_marker)
+          if phone_pos < 0:
+              raise SystemExit('Phone state declaration not found')
+          insert_at = phone_pos + len(phone_marker)
+          text = text[:insert_at] + '\n' + picker_block + text[insert_at:]
+          path.write_text(text)
+          print('Fixed contact picker scope.')
+          PY
+
+      - name: Commit source fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git commit -m "Fix contact picker phone state scope"
+          git push origin refactor/student-card-v47
+
+      - name: Remove one-shot workflows
+        if: success()
+        run: |
+          git rm -f .github/workflows/run-contact-picker-fix.yml .github/workflows/fix-contact-picker-build.yml 2>/dev/null || true
+          git commit -m "Remove contact picker fix workflows" || true
+          git push origin refactor/student-card-v47 || true
