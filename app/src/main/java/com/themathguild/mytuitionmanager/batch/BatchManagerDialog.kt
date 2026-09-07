@@ -28,19 +28,18 @@ fun BatchManagerDialog(
     var editingBatchId by remember { mutableStateOf<Long?>(null) }
     var showRoutineEditor by remember { mutableStateOf(false) }
     var editingRoutineId by remember { mutableStateOf<Long?>(null) }
-    var batchName by remember { mutableStateOf("") }
-    var batchAddress by remember { mutableStateOf("") }
-    var routineBatch by remember { mutableStateOf("") }
+    var selectedBatch by remember { mutableStateOf(localBatches.firstOrNull()?.name ?: "") }
     var routineDay by remember { mutableStateOf("Monday") }
     var routineStart by remember { mutableStateOf("") }
     var routineEnd by remember { mutableStateOf("") }
+    var batchName by remember { mutableStateOf("") }
+    var batchAddress by remember { mutableStateOf("") }
     var deleteBatchTarget by remember { mutableStateOf<Batch?>(null) }
 
-    val sortedRoutines = localRoutines.sortedWith(
-        compareBy<BatchRoutine> { routineDays.indexOf(it.day.replaceFirstChar { c -> c.uppercase() }).let { i -> if (i < 0) 99 else i } }
-            .thenBy { it.start.lowercase() }
-            .thenBy { it.batch.lowercase() }
-    )
+    val selectedBatchRoutines = localRoutines.filter { it.batch == selectedBatch }
+    val selectedBatchByDay = routineDays.associateWith { day ->
+        selectedBatchRoutines.firstOrNull { it.day.equals(day, ignoreCase = true) }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -82,54 +81,58 @@ fun BatchManagerDialog(
                 ) { Text("+ Add Batch") }
 
                 HorizontalDivider()
-                Text("Weekly Routine", fontWeight = FontWeight.Bold)
-                Text("Your weekly teaching schedule", style = MaterialTheme.typography.bodySmall)
+                Text("Batch-wise Routine", fontWeight = FontWeight.Bold)
+                Text("Select a batch to view and manage its weekly teaching schedule.", style = MaterialTheme.typography.bodySmall)
 
-                if (sortedRoutines.isEmpty()) {
-                    Text("No routines yet. Add a routine below.", style = MaterialTheme.typography.bodySmall)
+                if (localBatches.isEmpty()) {
+                    Text("Add a batch first to create its routine.", style = MaterialTheme.typography.bodySmall)
                 } else {
+                    LaunchedEffect(localBatches.map { it.name }) {
+                        if (selectedBatch !in localBatches.map { it.name }) {
+                            selectedBatch = localBatches.first().name
+                        }
+                    }
+                    SimpleDropdownField("Batch", selectedBatch, localBatches.map { it.name }) { selectedBatch = it }
+
+                    Text(
+                        "$selectedBatch — Weekly Routine",
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+
                     routineDays.forEach { day ->
-                        val dayRoutines = sortedRoutines.filter { it.day.equals(day, ignoreCase = true) }
-                        if (dayRoutines.isNotEmpty()) {
-                            Text(day, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp))
-                            dayRoutines.forEach { routine ->
-                                Card(Modifier.fillMaxWidth()) {
-                                    Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                                        Column(Modifier.weight(1f)) {
-                                            Text(routine.batch, fontWeight = FontWeight.SemiBold)
-                                            Text("${routine.start} – ${routine.end}", style = MaterialTheme.typography.bodySmall)
-                                        }
-                                        TextButton(onClick = {
-                                            editingRoutineId = routine.id
-                                            routineBatch = routine.batch
-                                            routineDay = routine.day
-                                            routineStart = routine.start
-                                            routineEnd = routine.end
-                                            showRoutineEditor = true
-                                        }) { Text("Edit") }
-                                        TextButton(onClick = {
-                                            localRoutines = localRoutines.filterNot { it.id == routine.id }
-                                            onSaveRoutines(localRoutines)
-                                        }) { Text("Delete") }
-                                    }
+                        val routine = selectedBatchByDay[day]
+                        Card(Modifier.fillMaxWidth()) {
+                            Row(
+                                Modifier.fillMaxWidth().padding(10.dp),
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(day, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        if (routine == null) "No routine scheduled" else "${routine.start} – ${routine.end}",
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                                TextButton(onClick = {
+                                    editingRoutineId = routine?.id
+                                    routineDay = day
+                                    routineStart = routine?.start ?: ""
+                                    routineEnd = routine?.end ?: ""
+                                    showRoutineEditor = true
+                                }) {
+                                    Text(if (routine == null) "Add" else "Edit")
+                                }
+                                if (routine != null) {
+                                    TextButton(onClick = {
+                                        localRoutines = localRoutines.filterNot { it.id == routine.id }
+                                        onSaveRoutines(localRoutines)
+                                    }) { Text("Delete") }
                                 }
                             }
                         }
                     }
                 }
-
-                Button(
-                    onClick = {
-                        editingRoutineId = null
-                        routineBatch = localBatches.firstOrNull()?.name ?: ""
-                        routineDay = "Monday"
-                        routineStart = ""
-                        routineEnd = ""
-                        showRoutineEditor = true
-                    },
-                    enabled = localBatches.isNotEmpty(),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("+ Add Routine") }
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } }
@@ -169,8 +172,10 @@ fun BatchManagerDialog(
                         }
                         if (oldName != null && oldName != cleanName) {
                             localRoutines = localRoutines.map { if (it.batch == oldName) it.copy(batch = cleanName) else it }
+                            if (selectedBatch == oldName) selectedBatch = cleanName
                             onRenameBatch(oldName, cleanName)
                         }
+                        if (editingBatchId == null) selectedBatch = cleanName
                         onSaveBatches(localBatches)
                         onSaveRoutines(localRoutines)
                         showBatchEditor = false
@@ -187,8 +192,8 @@ fun BatchManagerDialog(
             title = { Text(if (editingRoutineId == null) "Add Routine" else "Edit Routine") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SimpleDropdownField("Batch", routineBatch, localBatches.map { it.name }) { routineBatch = it }
-                    SimpleDropdownField("Day", routineDay, routineDays) { routineDay = it }
+                    Text("Batch: $selectedBatch", fontWeight = FontWeight.SemiBold)
+                    Text("Day: $routineDay", style = MaterialTheme.typography.bodySmall)
                     OutlinedTextField(
                         value = routineStart,
                         onValueChange = { routineStart = it },
@@ -207,7 +212,7 @@ fun BatchManagerDialog(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    val cleanBatch = routineBatch.trim()
+                    val cleanBatch = selectedBatch.trim()
                     val cleanDay = routineDay.trim()
                     val cleanStart = routineStart.trim()
                     val cleanEnd = routineEnd.trim()
@@ -246,6 +251,7 @@ fun BatchManagerDialog(
                 Button(onClick = {
                     localBatches = localBatches.filterNot { it.id == batch.id }
                     localRoutines = localRoutines.filterNot { it.batch == batch.name }
+                    if (selectedBatch == batch.name) selectedBatch = localBatches.firstOrNull()?.name ?: ""
                     onSaveBatches(localBatches)
                     onSaveRoutines(localRoutines)
                     deleteBatchTarget = null
