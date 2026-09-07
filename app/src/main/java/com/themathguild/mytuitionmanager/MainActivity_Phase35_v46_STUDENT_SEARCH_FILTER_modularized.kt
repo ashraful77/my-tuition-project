@@ -1379,6 +1379,9 @@ fun TuitionProfileDialog(
     var teacherName by remember { mutableStateOf(profile.teacherName) }
     var qualification by remember { mutableStateOf(profile.qualification) }
     var phone by remember { mutableStateOf(profile.phone) }
+
+    val context = LocalContext.current
+    var search by remember { mutableStateOf("") }
     var address by remember { mutableStateOf(profile.address) }
 
     AlertDialog(
@@ -1862,8 +1865,6 @@ fun LibraryDialog(
     onAdd: () -> Unit,
     onDelete: (LibraryItem) -> Unit
 ) {
-    val context = LocalContext.current
-    var search by remember { mutableStateOf("") }
     val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }
     AlertDialog(onDismissRequest=onDismiss,title={Text("Tuition Library")},text={Column(Modifier.fillMaxWidth().heightIn(max=560.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         Text("Save notes, PDFs, books and tuition documents on this phone.",style=MaterialTheme.typography.bodySmall)
