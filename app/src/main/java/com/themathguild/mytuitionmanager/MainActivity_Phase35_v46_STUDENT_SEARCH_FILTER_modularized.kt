@@ -550,7 +550,7 @@ fun TuitionApp(store: LocalStore) {
                     NavigationBarItem(selected = selectedBottomTab == 1, onClick = { navigateToTab(1) }, icon = { Text("☷") }, label = { Text("Students") })
                     NavigationBarItem(selected = selectedBottomTab == 2, onClick = { navigateToTab(2) }, icon = { Text("🎓") }, label = { Text("Live Batch") })
                     NavigationBarItem(selected = selectedBottomTab == 3, onClick = { navigateToTab(3) }, icon = { Text("₹") }, label = { Text("Payments") })
-                    NavigationBarItem(selected = selectedBottomTab == 5, onClick = { navigateToTab(5) }, icon = { Text("⚙") }, label = { Text("Settings") })
+                    NavigationBarItem(selected = selectedBottomTab == 4, onClick = { navigateToTab(4) }, icon = { Text("⚙") }, label = { Text("Settings") })
                 }
             }
         ) { padding ->
