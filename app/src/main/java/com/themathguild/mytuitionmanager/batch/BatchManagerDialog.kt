@@ -10,6 +10,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.themathguild.mytuitionmanager.Batch
 import com.themathguild.mytuitionmanager.BatchRoutine
+import java.util.Locale
 
 private val routineDays = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -33,6 +34,8 @@ fun BatchManagerDialog(
     var routineDay by remember { mutableStateOf("Monday") }
     var routineStart by remember { mutableStateOf("") }
     var routineEnd by remember { mutableStateOf("") }
+    var showStartTimePicker by remember { mutableStateOf(false) }
+    var showEndTimePicker by remember { mutableStateOf(false) }
     var batchName by remember { mutableStateOf("") }
     var batchAddress by remember { mutableStateOf("") }
     var deleteBatchTarget by remember { mutableStateOf<Batch?>(null) }
@@ -200,20 +203,20 @@ fun BatchManagerDialog(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     SimpleDropdownField("Batch", routineBatch, localBatches.map { it.name }) { routineBatch = it }
                     SimpleDropdownField("Day", routineDay, routineDays) { routineDay = it }
-                    OutlinedTextField(
-                        value = routineStart,
-                        onValueChange = { routineStart = it },
-                        label = { Text("Start time (e.g. 7:00 AM)") },
-                        singleLine = true,
+
+                    OutlinedButton(
+                        onClick = { showStartTimePicker = true },
                         modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = routineEnd,
-                        onValueChange = { routineEnd = it },
-                        label = { Text("End time (e.g. 8:30 AM)") },
-                        singleLine = true,
+                    ) {
+                        Text("Start time: ${routineStart.ifBlank { "Select time" }}")
+                    }
+
+                    OutlinedButton(
+                        onClick = { showEndTimePicker = true },
                         modifier = Modifier.fillMaxWidth()
-                    )
+                    ) {
+                        Text("End time: ${routineEnd.ifBlank { "Select time" }}")
+                    }
                 }
             },
             confirmButton = {
@@ -242,6 +245,30 @@ fun BatchManagerDialog(
         )
     }
 
+    if (showStartTimePicker) {
+        RoutineTimePickerDialog(
+            title = "Select start time",
+            initialValue = routineStart,
+            onDismiss = { showStartTimePicker = false },
+            onTimeSelected = {
+                routineStart = it
+                showStartTimePicker = false
+            }
+        )
+    }
+
+    if (showEndTimePicker) {
+        RoutineTimePickerDialog(
+            title = "Select end time",
+            initialValue = routineEnd,
+            onDismiss = { showEndTimePicker = false },
+            onTimeSelected = {
+                routineEnd = it
+                showEndTimePicker = false
+            }
+        )
+    }
+
     deleteBatchTarget?.let { batch ->
         val routineCount = localRoutines.count { it.batch == batch.name }
         AlertDialog(
@@ -267,6 +294,59 @@ fun BatchManagerDialog(
             dismissButton = { TextButton(onClick = { deleteBatchTarget = null }) { Text("Cancel") } }
         )
     }
+}
+
+@Composable
+private fun RoutineTimePickerDialog(
+    title: String,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onTimeSelected: (String) -> Unit
+) {
+    val initial = parseTime(initialValue)
+    val timeState = rememberTimePickerState(
+        initialHour = initial.first,
+        initialMinute = initial.second,
+        is24Hour = false
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            TimePicker(state = timeState)
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onTimeSelected(formatTime(timeState.hour, timeState.minute))
+            }) { Text("OK") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+private fun parseTime(value: String): Pair<Int, Int> {
+    val match = Regex("(\\d{1,2}):(\\d{2})\\s*([AaPp][Mm])").find(value.trim()) ?: return 8 to 0
+    val hour12 = match.groupValues[1].toIntOrNull()?.coerceIn(1, 12) ?: 8
+    val minute = match.groupValues[2].toIntOrNull()?.coerceIn(0, 59) ?: 0
+    val pm = match.groupValues[3].equals("PM", ignoreCase = true)
+    val hour24 = when {
+        pm && hour12 != 12 -> hour12 + 12
+        !pm && hour12 == 12 -> 0
+        else -> hour12
+    }
+    return hour24 to minute
+}
+
+private fun formatTime(hour24: Int, minute: Int): String {
+    val suffix = if (hour24 >= 12) "PM" else "AM"
+    val hour12 = when (val h = hour24 % 12) {
+        0 -> 12
+        else -> h
+    }
+    return String.format(Locale.US, "%d:%02d %s", hour12, minute, suffix)
 }
 
 @Composable
