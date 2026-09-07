@@ -1,0 +1,58 @@
+name: Remove Expense Tab
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  remove-expense-tab:
+    if: github.actor == 'ashraful77'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Remove Expense navigation and screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text(encoding='utf-8')
+          original = s
+
+          # Remove the Daily Spent screen import; keep the underlying data/storage intact.
+          s = s.replace('import com.themathguild.mytuitionmanager.dailyspent.DailySpentScreen\n', '')
+
+          # Remove the Expense/Daily Spent tab entry from common tab-list forms.
+          patterns = [
+              r'\s*Tab\(selected\s*=\s*[^\n]+,\s*onClick\s*=\s*\{\s*[^\n]*\}\s*\)\s*\{\s*Text\("(?:Expense|Daily Spent)"\)\s*\}',
+              r'\s*"(?:Expense|Daily Spent)"\s*[,)]',
+          ]
+          for pat in patterns:
+              s = re.sub(pat, lambda m: '' if 'Tab(' in m.group(0) else (')' if m.group(0).rstrip().endswith(')') else ''), s, flags=re.DOTALL if 'Tab(' in pat else 0)
+
+          # Remove a simple if/when branch whose body is the DailySpentScreen call.
+          s = re.sub(r'\n\s*DailySpentScreen\([^\n]*\)\s*', '\n', s)
+
+          if s == original:
+              raise SystemExit('No Expense/Daily Spent UI change was made; refusing to commit.')
+
+          # Safety: do not remove the dailySpent data/backup keys or DailySpent implementation file.
+          p.write_text(s, encoding='utf-8')
+          print('Expense/Daily Spent navigation removal applied.')
+          PY
+
+      - name: Commit and remove this workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git rm -f .github/workflows/remove-expense-tab.yml
+          git commit -m 'Remove Expense tab from app navigation'
+          git push origin refactor/student-card-v47
