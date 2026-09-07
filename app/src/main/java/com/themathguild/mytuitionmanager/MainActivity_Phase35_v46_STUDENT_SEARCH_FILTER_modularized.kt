@@ -1889,6 +1889,21 @@ fun StudentEditorDialog(
     onDismiss: () -> Unit,
     onSave: (Student) -> Unit
 ) {
+    val standardClasses = listOf("V", "VI", "VII", "VIII", "IX", "X")
+    val existing = initialStudent?.className ?: ""
+
+    var name by remember { mutableStateOf(initialStudent?.name ?: "") }
+    var cls by remember {
+        mutableStateOf(if (existing.isBlank() || existing in standardClasses) existing else "Others")
+    }
+    var otherClass by remember {
+        mutableStateOf(if (existing.isNotBlank() && existing !in standardClasses) existing else "")
+    }
+    var classOpen by remember { mutableStateOf(false) }
+    var batch by remember { mutableStateOf(initialStudent?.batch ?: "") }
+    var fee by remember { mutableStateOf(initialStudent?.monthlyFee?.toString() ?: "") }
+    var phone by remember { mutableStateOf(initialStudent?.phone ?: "") }
+
     val context = LocalContext.current
     val phonePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -1912,20 +1927,7 @@ fun StudentEditorDialog(
         }
     }
 
-    val standardClasses = listOf("V", "VI", "VII", "VIII", "IX", "X")
-    val existing = initialStudent?.className ?: ""
 
-    var name by remember { mutableStateOf(initialStudent?.name ?: "") }
-    var cls by remember {
-        mutableStateOf(if (existing.isBlank() || existing in standardClasses) existing else "Others")
-    }
-    var otherClass by remember {
-        mutableStateOf(if (existing.isNotBlank() && existing !in standardClasses) existing else "")
-    }
-    var classOpen by remember { mutableStateOf(false) }
-    var batch by remember { mutableStateOf(initialStudent?.batch ?: "") }
-    var fee by remember { mutableStateOf(initialStudent?.monthlyFee?.toString() ?: "") }
-    var phone by remember { mutableStateOf(initialStudent?.phone ?: "") }
     var school by remember { mutableStateOf(initialStudent?.school ?: "") }
     var fatherName by remember { mutableStateOf(initialStudent?.fatherName ?: "") }
     var motherName by remember { mutableStateOf(initialStudent?.motherName ?: "") }
