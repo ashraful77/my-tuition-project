@@ -1,4 +1,4 @@
-name: Fix contact picker scope
+name: Fix LibraryDialog scope
 
 on:
   push:
@@ -10,59 +10,43 @@ permissions:
 
 jobs:
   fix:
-    if: github.actor == 'ashraful77'
+    if: github.actor == 'ashraful77' || github.actor == 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           ref: refactor/student-card-v47
 
-      - name: Move launcher below phone state
+      - name: Fix LibraryDialog scope
         run: |
           python3 - <<'PY'
           from pathlib import Path
           path = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
-          lines = path.read_text(encoding='utf-8').splitlines(keepends=True)
+          s = path.read_text(encoding='utf-8')
 
-          context_idx = next((i for i, line in enumerate(lines) if line.strip() == 'val context = LocalContext.current'), -1)
-          if context_idx < 0:
-              raise SystemExit('Contact picker context declaration not found')
+          marker = '''fun LibraryDialog(\n    items: List<LibraryItem>,\n    onDismiss: () -> Unit,\n    onAdd: () -> Unit,\n    onDelete: (LibraryItem) -> Unit\n) {'''
+          if marker not in s:
+              raise SystemExit('LibraryDialog declaration not found')
 
-          end_idx = context_idx
-          balance = 0
-          started = False
-          while end_idx < len(lines):
-              line = lines[end_idx]
-              balance += line.count('{') - line.count('}')
-              if '{' in line:
-                  started = True
-              if started and balance == 0:
-                  end_idx += 1
-                  break
-              end_idx += 1
-          while end_idx < len(lines) and lines[end_idx].strip() == '':
-              end_idx += 1
+          old = '''} {\n    val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }'''
+          replacement = '''} {\n    var search by remember { mutableStateOf(\"\") }\n    val context = LocalContext.current\n\n    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
+          if old in s:
+              s = s.replace(old, replacement, 1)
+          else:
+              old2 = '''} {\n    var search by remember { mutableStateOf(\"\") }\n    val context = LocalContext.current\n\n    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
+              if old2 not in s:
+                  raise SystemExit('LibraryDialog scope insertion point not found')
 
-          launcher_lines = lines[context_idx:end_idx]
-          del lines[context_idx:end_idx]
-
-          phone_idx = next((i for i, line in enumerate(lines) if line.lstrip().startswith('var phone ')), -1)
-          if phone_idx < 0:
-              raise SystemExit('Phone state declaration not found')
-
-          lines[phone_idx + 1:phone_idx + 1] = ['\n'] + launcher_lines
-          path.write_text(''.join(lines), encoding='utf-8')
-          print('Contact picker launcher moved below phone state declaration.')
+          path.write_text(s, encoding='utf-8')
+          print('LibraryDialog search/context scope fixed.')
           PY
 
-      - name: Commit source fix and clean up
+      - name: Commit source fix and clean up temporary workflows
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
-          git commit -m 'Fix contact picker phone state scope'
-          git push origin refactor/student-card-v47
-
-          git rm -f .github/workflows/run-contact-picker-fix.yml .github/workflows/fix-contact-picker-build.yml .github/workflows/fix-contact-picker-scope.yml .github/contact-fix-trigger.txt .github/contact-fix-trigger-2.txt .github/contact-fix-trigger-3.txt .github/contact-fix-trigger-final.txt 2>/dev/null || true
-          git commit -m 'Remove temporary contact picker workflows' || true
-          git push origin refactor/student-card-v47 || true
+          git rm -f .github/workflows/fix-contact-picker-scope.yml .github/workflows/fix-library-dialog-scope.yml 2>/dev/null || true
+          git commit -m 'Fix LibraryDialog search and context scope'
+          git push origin HEAD:refactor/student-card-v47
