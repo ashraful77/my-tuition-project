@@ -1889,6 +1889,29 @@ fun StudentEditorDialog(
     onDismiss: () -> Unit,
     onSave: (Student) -> Unit
 ) {
+    val context = LocalContext.current
+    val phonePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val numberIndex = cursor.getColumnIndex(android.provider.ContactsContract.CommonDataKinds.Phone.NUMBER)
+                        if (numberIndex >= 0) phone = cursor.getString(numberIndex) ?: ""
+                    }
+                }
+            }
+        }
+    }
+
     val standardClasses = listOf("V", "VI", "VII", "VIII", "IX", "X")
     val existing = initialStudent?.className ?: ""
 
@@ -2017,6 +2040,19 @@ fun StudentEditorDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                     singleLine = true, modifier = Modifier.fillMaxWidth()
                 )
+                OutlinedButton(
+                    onClick = {
+                        phonePickerLauncher.launch(
+                            Intent(
+                                Intent.ACTION_PICK,
+                                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Pick phone number from Contacts")
+                }
 
                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
                 Text("Student Status", fontWeight = FontWeight.Bold)
