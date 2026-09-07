@@ -1,0 +1,42 @@
+name: Fix LibraryDialog scope
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fix LibraryDialog scope
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text()
+          old = '''    val visible = items.filter { search.isBlank() || it.name.contains(search,true) || it.category.contains(search,true) }'''
+          new = '''    var search by remember { mutableStateOf(\"\") }
+    val context = LocalContext.current
+
+    val visible = items.filter { search.isBlank() || it.name.contains(search, true) || it.category.contains(search, true) }'''
+          if old not in s:
+              raise SystemExit('Expected LibraryDialog code not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          PY
+
+      - name: Commit source fix and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git rm .github/workflows/fix-library-dialog-scope.yml
+          git commit -m "Fix LibraryDialog search and context scope"
+          git push origin HEAD:refactor/student-card-v47
