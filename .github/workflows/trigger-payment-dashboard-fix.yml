@@ -1,0 +1,23 @@
+name: Trigger payment dashboard fix
+on:
+  push:
+    branches: [refactor/student-card-v47]
+permissions:
+  contents: write
+jobs:
+  trigger:
+    if: github.event.head_commit.message != 'Trigger payment dashboard fix'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+          fetch-depth: 1
+      - name: Trigger fix workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/trigger-payment-dashboard-fix.yml
+          git commit -m "Trigger payment dashboard fix"
+          git push origin HEAD:refactor/student-card-v47
