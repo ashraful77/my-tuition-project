@@ -55,7 +55,7 @@ fun StudentCard(
 
     val collectAmount = maxOf(0, student.monthlyFee - paid)
     val paymentStatus = when {
-        paid >= student.monthlyFee && student.monthlyFee > 0 -> "PAID"
+        totalDue == 0 && student.monthlyFee > 0 -> "PAID"
         paid > 0 -> "PARTIAL"
         else -> "DUE"
     }
