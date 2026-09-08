@@ -482,7 +482,8 @@ fun TuitionApp(store: LocalStore) {
         val start = monthKey(student.joiningMonth) ?: payments.filter { it.studentId == student.id }.mapNotNull { monthKey(it.month) }.minOrNull() ?: YearMonth.now()
         val ps = payments.filter { it.studentId == student.id }
         var m = start; var due = 0
-        while (!m.isAfter(YearMonth.now())) {
+        val dueThrough = YearMonth.now().minusMonths(1)
+        while (!m.isAfter(dueThrough)) {
             val paid = ps.filter { it.month.equals(m.format(monthFormatter), true) }.sumOf { it.amount }
             due += maxOf(0, student.monthlyFee - paid); m = m.plusMonths(1)
         }
