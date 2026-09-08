@@ -477,7 +477,12 @@ fun TuitionApp(store: LocalStore) {
     }
 
     val thisMonth = currentMonth()
+    val previousMonth = YearMonth.now().minusMonths(1)
     fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }
+    fun paidThroughPreviousMonth(student: Student): Int = payments
+        .filter { it.studentId == student.id }
+        .filter { monthKey(it.month)?.let { month -> !month.isAfter(previousMonth) } == true }
+        .sumOf { it.amount }
     fun outstanding(student: Student): Int {
         val start = monthKey(student.joiningMonth) ?: payments.filter { it.studentId == student.id }.mapNotNull { monthKey(it.month) }.minOrNull() ?: YearMonth.now()
         val ps = payments.filter { it.studentId == student.id }
@@ -490,9 +495,9 @@ fun TuitionApp(store: LocalStore) {
         return due
     }
 
-    val paidStudents = students.count { currentPaid(it) >= it.monthlyFee }
-    val partialStudents = students.count { currentPaid(it) > 0 && currentPaid(it) < it.monthlyFee }
-    val unpaidStudents = students.count { currentPaid(it) == 0 }
+    val paidStudents = students.count { outstanding(it) == 0 }
+    val partialStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) > 0 }
+    val unpaidStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) == 0 }
     val totalOutstanding = students.sumOf { outstanding(it) }
     val totalCollected = payments.filter { it.month.equals(thisMonth, true) }.sumOf { it.amount }
     val expectedThisMonth = students.sumOf { it.monthlyFee }
@@ -1685,18 +1690,8 @@ fun ManageStudentsDialog(
         .filter { batchFilter == "All" || it.batch == batchFilter }
         .filter { student ->
             when (paymentFilter) {
-                "Paid" -> {
-                    val paid = payments
-                        .filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }
-                        .sumOf { it.amount }
-                    paid >= student.monthlyFee && student.monthlyFee > 0
-                }
-                "Due" -> {
-                    val paid = payments
-                        .filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }
-                        .sumOf { it.amount }
-                    paid < student.monthlyFee
-                }
+                "Paid" -> outstandingFor(student) == 0
+                "Due" -> outstandingFor(student) > 0
                 else -> true
             }
         }
