@@ -1,1 +1,1 @@
-Temporary trigger for payment rule update.
+Trigger payment rule application - final.
