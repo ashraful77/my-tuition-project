@@ -5,6 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.themathguild.mytuitionmanager.AttendanceRecord
@@ -12,6 +13,12 @@ import com.themathguild.mytuitionmanager.Payment
 import com.themathguild.mytuitionmanager.Student
 import com.themathguild.mytuitionmanager.StatusBadge
 import com.themathguild.mytuitionmanager.currentMonth
+import com.themathguild.mytuitionmanager.monthKey
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
 
 @Composable
 fun StudentCard(
@@ -25,7 +32,28 @@ fun StudentCard(
     onDelete: (Student) -> Unit
 ) {
     val paid = payments.filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }.sumOf { it.amount }
-    val due = maxOf(0, student.monthlyFee - paid)
+
+    val totalDue = run {
+        val start = monthKey(student.joiningMonth)
+            ?: payments.filter { it.studentId == student.id }
+                .mapNotNull { monthKey(it.month) }
+                .minOrNull()
+            ?: YearMonth.now()
+        val dueThrough = YearMonth.now().minusMonths(1)
+        val studentPayments = payments.filter { it.studentId == student.id }
+        var month = start
+        var amount = 0
+        while (!month.isAfter(dueThrough)) {
+            val monthPaid = studentPayments
+                .filter { it.month.equals(month.format(monthFormatter), true) }
+                .sumOf { it.amount }
+            amount += maxOf(0, student.monthlyFee - monthPaid)
+            month = month.plusMonths(1)
+        }
+        amount
+    }
+
+    val collectAmount = maxOf(0, student.monthlyFee - paid)
     val paymentStatus = when {
         paid >= student.monthlyFee && student.monthlyFee > 0 -> "PAID"
         paid > 0 -> "PARTIAL"
@@ -41,10 +69,16 @@ fun StudentCard(
                 }
                 StatusBadge(paymentStatus) { onOpenProfile(student) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 StatusBadge(student.status)
-                if (paymentStatus != "PAID") Text("Due ₹$due", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
-                else Text("Paid this month", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodySmall)
+                if (totalDue > 0) {
+                    Text(
+                        "Due ₹$totalDue",
+                        color = Color(0xFFC62828),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
             }
             HorizontalDivider()
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -57,7 +91,7 @@ fun StudentCard(
             if (student.phone.isNotBlank()) Text("☎ ${student.phone}", style = MaterialTheme.typography.bodySmall)
             if (isActiveTab) {
                 FilledTonalButton(onClick = { onCollect(student) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (due > 0) "Collect Fee • ₹$due" else "View / Collect Fee")
+                    Text(if (collectAmount > 0) "Collect Fee • ₹$collectAmount" else "View / Collect Fee")
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
