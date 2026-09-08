@@ -1,0 +1,55 @@
+name: Compact Student Filters
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  compact:
+    if: github.actor == 'ashraful77'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Compact filter UI
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text(encoding='utf-8')
+
+          old_state = '''    var paymentFilter by remember { mutableStateOf("All") }\n    var classFilter by remember { mutableStateOf("All") }\n    var batchFilter by remember { mutableStateOf("All") }'''
+          new_state = '''    var paymentFilter by remember { mutableStateOf("All") }\n    var classFilter by remember { mutableStateOf("All") }\n    var batchFilter by remember { mutableStateOf("All") }\n    var classMenuOpen by remember { mutableStateOf(false) }\n    var batchMenuOpen by remember { mutableStateOf(false) }'''
+          if old_state not in s:
+              raise SystemExit('Filter state block not found')
+          s = s.replace(old_state, new_state, 1)
+
+          start = '                if (filterOpen) {\n'
+          end = '''                Row(\n                    Modifier\n                        .fillMaxWidth()\n                        .horizontalScroll(rememberScrollState()),'''
+          a = s.find(start)
+          if a < 0:
+              raise SystemExit('Filter panel start not found')
+          b = s.find(end, a)
+          if b < 0:
+              raise SystemExit('Filter panel end not found')
+
+          compact = '''                if (filterOpen) {\n                    Card(Modifier.fillMaxWidth()) {\n                        Column(\n                            Modifier.padding(horizontal = 10.dp, vertical = 7.dp),\n                            verticalArrangement = Arrangement.spacedBy(6.dp)\n                        ) {\n                            Text("Filter students", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)\n\n                            Row(\n                                Modifier.fillMaxWidth(),\n                                horizontalArrangement = Arrangement.spacedBy(5.dp),\n                                verticalAlignment = Alignment.CenterVertically\n                            ) {\n                                listOf("All", "Paid", "Due").forEach { option ->\n                                    FilterChip(\n                                        selected = paymentFilter == option,\n                                        onClick = { paymentFilter = option },\n                                        label = { Text(option) },\n                                        modifier = Modifier.height(36.dp)\n                                    )\n                                }\n                            }\n\n                            Row(\n                                Modifier.fillMaxWidth(),\n                                horizontalArrangement = Arrangement.spacedBy(6.dp),\n                                verticalAlignment = Alignment.CenterVertically\n                            ) {\n                                Box(Modifier.weight(1f)) {\n                                    OutlinedButton(\n                                        onClick = { classMenuOpen = true },\n                                        modifier = Modifier.fillMaxWidth().height(42.dp),\n                                        contentPadding = PaddingValues(horizontal = 10.dp)\n                                    ) {\n                                        Text("Class: $classFilter", maxLines = 1)\n                                    }\n                                    DropdownMenu(\n                                        expanded = classMenuOpen,\n                                        onDismissRequest = { classMenuOpen = false }\n                                    ) {\n                                        classOptions.forEach { option ->\n                                            DropdownMenuItem(\n                                                text = { Text("Class: $option") },\n                                                onClick = { classFilter = option; classMenuOpen = false }\n                                            )\n                                        }\n                                    }\n                                }\n\n                                Box(Modifier.weight(1f)) {\n                                    OutlinedButton(\n                                        onClick = { batchMenuOpen = true },\n                                        modifier = Modifier.fillMaxWidth().height(42.dp),\n                                        contentPadding = PaddingValues(horizontal = 10.dp)\n                                    ) {\n                                        Text("Batch: $batchFilter", maxLines = 1)\n                                    }\n                                    DropdownMenu(\n                                        expanded = batchMenuOpen,\n                                        onDismissRequest = { batchMenuOpen = false }\n                                    ) {\n                                        batchOptions.forEach { option ->\n                                            DropdownMenuItem(\n                                                text = { Text("Batch: $option") },\n                                                onClick = { batchFilter = option; batchMenuOpen = false }\n                                            )\n                                        }\n                                    }\n                                }\n                            }\n\n                            if (paymentFilter != "All" || classFilter != "All" || batchFilter != "All") {\n                                TextButton(\n                                    onClick = {\n                                        paymentFilter = "All"\n                                        classFilter = "All"\n                                        batchFilter = "All"\n                                    },\n                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),\n                                    modifier = Modifier.height(32.dp)\n                                ) { Text("Clear filters") }\n                            }\n                        }\n                    }\n                }\n\n'''
+          s = s[:a] + compact + s[b:]
+          p.write_text(s, encoding='utf-8')
+          print('Compact student filter UI applied.')
+          PY
+
+      - name: Commit and clean up
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git rm -f .github/workflows/compact-student-filters.yml
+          git commit -m 'Compact student filter panel'
+          git push origin refactor/student-card-v47
