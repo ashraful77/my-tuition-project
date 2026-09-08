@@ -1,10 +1,10 @@
-name: Apply Payment Rule
+name: Fix Dashboard Due
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - scripts/apply_payment_rule.py
+      - scripts/fix_dashboard_due.py
 
 permissions:
   contents: write
@@ -16,12 +16,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: refactor/student-card-v47
-      - name: Apply payment rule
-        run: python3 scripts/apply_payment_rule.py
+      - name: Apply dashboard due fix
+        run: python3 scripts/fix_dashboard_due.py
       - name: Commit source change
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
-          git commit -m 'Restrict normal payments and add explicit advance mode'
+          git commit -m 'Fix dashboard due calculation cutoff'
           git push origin refactor/student-card-v47
