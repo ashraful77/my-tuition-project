@@ -6,6 +6,9 @@ on:
       - refactor/student-card-v47
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
