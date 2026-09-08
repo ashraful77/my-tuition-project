@@ -415,7 +415,7 @@ fun TuitionApp(store: LocalStore) {
     var deletePaymentConfirm by remember { mutableStateOf<Payment?>(null) }
     var settingsOpen by remember { mutableStateOf(false) }
     var tuitionProfileOpen by remember { mutableStateOf(false) }
-    var dashboardExpanded by remember { mutableStateOf(true) }
+    var dashboardExpanded by remember { mutableStateOf(false) }
     var sortOption by remember { mutableStateOf("Name A–Z") }
     var selectedClass by remember { mutableStateOf("All") }
     var filtersExpanded by remember { mutableStateOf(false) }
@@ -675,6 +675,20 @@ fun TuitionApp(store: LocalStore) {
                             }
                             todayRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
                             if(todayRoutines.isEmpty()) Text("No routine set for today. Use Live Batch or Settings to add one.", style=MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                }
+
+                item {
+                    val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time
+                    val tomorrowDayName = SimpleDateFormat("EEEE", Locale.getDefault()).format(tomorrow)
+                    val tomorrowRoutines = routines.filter { it.day.equals(tomorrowDayName, true) }
+                    Card(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(12.dp)) {
+                            Text("Tomorrow’s Work", fontWeight=FontWeight.Bold)
+                            Text("$tomorrowDayName • ${tomorrowRoutines.size} scheduled batch${if(tomorrowRoutines.size==1) "" else "es"}", style=MaterialTheme.typography.labelSmall)
+                            tomorrowRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
+                            if(tomorrowRoutines.isEmpty()) Text("No routine set for tomorrow. Use Live Batch or Settings to add one.", style=MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
