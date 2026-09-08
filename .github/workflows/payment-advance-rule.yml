@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   apply:
+    if: github.actor == 'ashraful77'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,7 +18,7 @@ jobs:
           ref: refactor/student-card-v47
       - name: Apply payment rule
         env:
-          SCRIPT_B64: "cHl0aG9uIHNjcmlwdCBjb250ZW50IGlzIGJhc2VkNjQgaW4gdGhpcyB3b3JrZmxvdyBhbmQgd2lsbCBiZSByZXBsYWNlZCBiZWxvdy4="
+          SCRIPT_B64: "ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnA9UGF0aCgicmVwbGFjZW1lbnRfcGF0aCIpCnM9cC5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikK"
         run: |
           echo "$SCRIPT_B64" | base64 -d > /tmp/patch.py
           python3 /tmp/patch.py
