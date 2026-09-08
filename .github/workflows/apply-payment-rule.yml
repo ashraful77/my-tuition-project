@@ -1,0 +1,26 @@
+name: Apply Payment Rule
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+      - name: Apply payment rule
+        run: python3 scripts/apply_payment_rule.py
+      - name: Commit source change
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git commit -m 'Restrict normal payments and add explicit advance mode'
+          git push origin refactor/student-card-v47
