@@ -1,0 +1,89 @@
+name: Fix payment dashboard and filters
+on:
+  push:
+    branches: [refactor/student-card-v47]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'Fix payment dashboard and filters'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+          fetch-depth: 1
+      - name: Apply payment status logic
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text()
+
+          old = '''    val thisMonth = currentMonth()
+    fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }
+    fun outstanding(student: Student): Int {'''
+          new = '''    val thisMonth = currentMonth()
+    val previousMonth = YearMonth.now().minusMonths(1)
+    fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }
+    fun paidThroughPreviousMonth(student: Student): Int = payments
+        .filter { it.studentId == student.id }
+        .filter { monthKey(it.month)?.let { month -> !month.isAfter(previousMonth) } == true }
+        .sumOf { it.amount }
+    fun outstanding(student: Student): Int {'''
+          if old not in s:
+              raise SystemExit('Missing payment helper block')
+          s = s.replace(old, new, 1)
+
+          old = '''    val paidStudents = students.count { currentPaid(it) >= it.monthlyFee }
+    val partialStudents = students.count { currentPaid(it) > 0 && currentPaid(it) < it.monthlyFee }
+    val unpaidStudents = students.count { currentPaid(it) == 0 }'''
+          new = '''    val paidStudents = students.count { outstanding(it) == 0 }
+    val partialStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) > 0 }
+    val unpaidStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) == 0 }'''
+          if old not in s:
+              raise SystemExit('Missing dashboard payment counters')
+          s = s.replace(old, new, 1)
+
+          old = '''                "Paid" -> {
+                    val paid = payments
+                        .filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }
+                        .sumOf { it.amount }
+                    paid >= student.monthlyFee && student.monthlyFee > 0
+                }
+                "Due" -> outstandingFor(student) > 0'''
+          new = '''                "Paid" -> outstandingFor(student) == 0
+                "Due" -> outstandingFor(student) > 0'''
+          if old not in s:
+              raise SystemExit('Missing Manage Students payment filters')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+          print('Payment dashboard and filter fix applied.')
+
+      - name: Verify payment logic
+        shell: python
+        run: |
+          from pathlib import Path
+          s = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt').read_text()
+          checks = [
+              'fun paidThroughPreviousMonth(student: Student): Int',
+              'val paidStudents = students.count { outstanding(it) == 0 }',
+              '"Paid" -> outstandingFor(student) == 0',
+              '"Due" -> outstandingFor(student) > 0'
+          ]
+          for check in checks:
+              if check not in s:
+                  raise SystemExit(f'Missing verification text: {check}')
+          print('Payment dashboard/filter logic verified.')
+
+      - name: Commit and clean up
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git rm .github/workflows/fix-payment-dashboard.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix payment dashboard and filters"
+          git push origin HEAD:refactor/student-card-v47
