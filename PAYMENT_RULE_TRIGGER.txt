@@ -1,1 +1,1 @@
-Trigger final payment rule application.
+Trigger payment rule script - v2.
