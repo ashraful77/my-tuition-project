@@ -1,1 +1,1 @@
-Trigger payment rule application - final.
+Trigger final payment rule application.
