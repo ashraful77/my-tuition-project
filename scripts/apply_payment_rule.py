@@ -3,7 +3,7 @@ from pathlib import Path
 p = Path("app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt")
 s = p.read_text(encoding="utf-8")
 
-old = """fun eligibleFeeMonths(student: Student, existingPayments: List<Payment>): List<String> {
+old = """fun eligibleFeeMonths(student: Student, existingPayments: List[Payment>): List<String> {
     val join = monthKey(student.joiningMonth) ?: return emptyList()
     val latestAllowed = YearMonth.now().plusMonths(1)
     if (join.isAfter(latestAllowed)) return emptyList()
@@ -144,5 +144,17 @@ new = "onSave(ordered, allowAdvance)"
 if old not in s: raise SystemExit("onSave call not found")
 s = s.replace(old, new, 1)
 
+old = """        while (!m.isAfter(YearMonth.now())) {
+            val paid = ps.filter { it.month.equals(m.format(monthFormatter), true) }.sumOf { it.amount }
+            due += maxOf(0, student.monthlyFee - paid); m = m.plusMonths(1)
+        }"""
+new = """        val dueThrough = YearMonth.now().minusMonths(1)
+        while (!m.isAfter(dueThrough)) {
+            val paid = ps.filter { it.month.equals(m.format(monthFormatter), true) }.sumOf { it.amount }
+            due += maxOf(0, student.monthlyFee - paid); m = m.plusMonths(1)
+        }"""
+if old not in s: raise SystemExit("dashboard outstanding loop not found")
+s = s.replace(old, new, 1)
+
 p.write_text(s, encoding="utf-8")
-print("Payment rule applied successfully.")
+print("Payment rule and dashboard due cutoff applied successfully.")
