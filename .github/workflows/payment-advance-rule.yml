@@ -1,0 +1,258 @@
+name: Apply Payment Advance Rule
+
+on:
+  push:
+    branches:
+      - refactor/student-card-v47
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor == 'ashraful77'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/student-card-v47
+
+      - name: Update payment eligibility and advance mode
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text(encoding='utf-8')
+
+          old_fn = '''fun eligibleFeeMonths(student: Student, existingPayments: List<Payment>): List<String> {
+    val join = monthKey(student.joiningMonth) ?: return emptyList()
+    val latestAllowed = YearMonth.now().plusMonths(1)
+    if (join.isAfter(latestAllowed)) return emptyList()
+
+    val paidMonths = existingPayments.mapNotNull { monthKey(it.month) }.toSet()
+    return buildList {
+        var m = join
+        while (!m.isAfter(latestAllowed)) {
+            if (m !in paidMonths) add(m.format(monthFormatter))
+            m = m.plusMonths(1)
+        }
+    }
+}
+
+fun validateFeeCollection(
+    student: Student,
+    existingPayments: List<Payment>,
+    selectedMonths: List<String>
+): String? {
+    if (student.monthlyFee <= 0) return "Monthly fee must be greater than ₹0."
+    if (monthKey(student.joiningMonth) == null) return "Please enter a valid joining month."
+    if (selectedMonths.isEmpty()) return "Select at least one month."
+
+    val duplicate = selectedMonths.groupingBy { it.lowercase() }.eachCount().any { it.value > 1 }
+    if (duplicate) return "The same month cannot be selected twice."
+
+    val allowed = eligibleFeeMonths(student, existingPayments).toSet()
+    val invalid = selectedMonths.filter { it !in allowed }
+    if (invalid.isNotEmpty()) return "Payment not allowed for: ${invalid.joinToString(", ")}"
+
+    return null
+}'''
+
+          new_fn = '''fun eligibleFeeMonths(
+    student: Student,
+    existingPayments: List<Payment>,
+    allowAdvance: Boolean = false
+): List<String> {
+    val join = monthKey(student.joiningMonth) ?: return emptyList()
+    val now = YearMonth.now()
+    val latestAllowed = if (allowAdvance) now.plusMonths(12) else now.minusMonths(1)
+
+    if (join.isAfter(latestAllowed)) return emptyList()
+
+    val paidMonths = existingPayments.mapNotNull { monthKey(it.month) }.toSet()
+    return buildList {
+        var m = join
+        while (!m.isAfter(latestAllowed)) {
+            val isNormalMonth = !m.isAfter(now.minusMonths(1))
+            val isAdvanceMonth = allowAdvance && !m.isBefore(now)
+            if (m !in paidMonths && (isNormalMonth || isAdvanceMonth)) {
+                add(m.format(monthFormatter))
+            }
+            m = m.plusMonths(1)
+        }
+    }
+}
+
+fun validateFeeCollection(
+    student: Student,
+    existingPayments: List<Payment>,
+    selectedMonths: List<String>,
+    allowAdvance: Boolean = false
+): String? {
+    if (student.monthlyFee <= 0) return "Monthly fee must be greater than ₹0."
+    if (monthKey(student.joiningMonth) == null) return "Please enter a valid joining month."
+    if (selectedMonths.isEmpty()) return "Select at least one month."
+
+    val duplicate = selectedMonths.groupingBy { it.lowercase() }.eachCount().any { it.value > 1 }
+    if (duplicate) return "The same month cannot be selected twice."
+
+    val allowed = eligibleFeeMonths(student, existingPayments, allowAdvance).toSet()
+    val invalid = selectedMonths.filter { it !in allowed }
+    if (invalid.isNotEmpty()) {
+        return if (allowAdvance) {
+            "Advance payment not allowed for: ${invalid.joinToString(", ")}"
+        } else {
+            "Payment not allowed for: ${invalid.joinToString(", ")}"
+        }
+    }
+
+    return null
+}'''
+
+          if old_fn not in s:
+              raise SystemExit('Payment eligibility functions not found')
+          s = s.replace(old_fn, new_fn, 1)
+
+          old_callback = '''            ) { selectedMonths ->
+                val existingForStudent = payments.filter { it.studentId == s.id }
+                val error = validateFeeCollection(s, existingForStudent, selectedMonths)'''
+          new_callback = '''            ) { selectedMonths, allowAdvance ->
+                val existingForStudent = payments.filter { it.studentId == s.id }
+                val error = validateFeeCollection(s, existingForStudent, selectedMonths, allowAdvance)'''
+          if old_callback not in s:
+              raise SystemExit('CollectFeeDialog callback not found')
+          s = s.replace(old_callback, new_callback, 1)
+
+          start = s.find('@Composable\nfun CollectFeeDialog(')
+          if start < 0:
+              raise SystemExit('CollectFeeDialog not found')
+          end = s.find('\n@Composable\nfun EditPaymentDialog(', start)
+          if end < 0:
+              raise SystemExit('EditPaymentDialog boundary not found')
+
+          old_dialog = s[start:end]
+          new_dialog = '''@Composable
+fun CollectFeeDialog(
+    student: Student,
+    existingPayments: List<Payment>,
+    onDismiss: () -> Unit,
+    onSave: (List<String>, Boolean) -> Unit
+) {
+    var allowAdvance by remember { mutableStateOf(false) }
+    val eligibleMonths = eligibleFeeMonths(student, existingPayments, allowAdvance)
+
+    var selectedMonths by remember { mutableStateOf(emptySet<String>()) }
+    val total = selectedMonths.size * student.monthlyFee
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (allowAdvance) "Pay in Advance" else "Collect Fee") },
+        text = {
+            Column(
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(student.name, fontWeight = FontWeight.Bold)
+                Text("Monthly fee: ₹${student.monthlyFee}")
+
+                if (!allowAdvance) {
+                    Text("Select unpaid fee months up to the previous month.")
+                    Text(
+                        "Current month and future months require the separate Pay in Advance option.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            selectedMonths = emptySet()
+                            allowAdvance = true
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Pay in Advance")
+                    }
+                } else {
+                    Text("Select current or future months to pay in advance.")
+                    Text(
+                        "Advance payment can be made for up to 12 months ahead. Already-paid months are excluded.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            selectedMonths = emptySet()
+                            allowAdvance = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Back to Normal Payment")
+                    }
+                }
+
+                if (eligibleMonths.isEmpty()) {
+                    val joinValid = monthKey(student.joiningMonth) != null
+                    Text(
+                        if (!joinValid) "No eligible months: the joining month is invalid."
+                        else if (allowAdvance) "No future/current months available. They may already be paid."
+                        else "No unpaid months available through the previous month.",
+                        fontWeight = FontWeight.Bold
+                    )
+                } else {
+                    eligibleMonths.forEach { month ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                selectedMonths = if (selectedMonths.contains(month)) {
+                                    selectedMonths - month
+                                } else {
+                                    selectedMonths + month
+                                }
+                            },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = selectedMonths.contains(month),
+                                onCheckedChange = {
+                                    selectedMonths = if (it) selectedMonths + month
+                                    else selectedMonths - month
+                                }
+                            )
+                            Text(month)
+                        }
+                    }
+                }
+
+                if (selectedMonths.isNotEmpty()) {
+                    HorizontalDivider()
+                    Text("Months selected: ${selectedMonths.size}", fontWeight = FontWeight.Bold)
+                    Text("Total amount: ₹$total", fontWeight = FontWeight.Bold)
+                    Text("One receipt will be generated for all selected months.")
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = selectedMonths.isNotEmpty(),
+                onClick = {
+                    val ordered = selectedMonths.sortedWith(
+                        compareBy<String> { monthKey(it)?.toString() ?: "" }
+                    )
+                    onSave(ordered, allowAdvance)
+                }
+            ) { Text("Save Payment") }
+        },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel") } }
+    )
+}
+'''
+          s = s[:start] + new_dialog + s[end:]
+
+          p.write_text(s, encoding='utf-8')
+          print('Payment rule updated: normal payments through previous month; explicit advance mode for current/future months.')
+          PY
+
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          git rm -f .github/workflows/payment-advance-rule.yml
+          git commit -m 'Restrict normal payments and add explicit advance mode'
+          git push origin refactor/student-card-v47
