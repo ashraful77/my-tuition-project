@@ -2,6 +2,9 @@ name: Apply Payment Rule
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - scripts/apply_payment_rule.py
 
 permissions:
   contents: write
