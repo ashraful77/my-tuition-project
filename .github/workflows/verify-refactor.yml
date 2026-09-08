@@ -19,5 +19,62 @@ jobs:
         run: |
           ls -la
           find . -maxdepth 3 -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print
+      - name: Apply payment dashboard and filter fix
+        if: github.event.head_commit.message == 'Prepare payment dashboard fix'
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+          s = p.read_text()
+          old = '''    val thisMonth = currentMonth()\n    fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }\n    fun outstanding(student: Student): Int {'''
+          new = '''    val thisMonth = currentMonth()\n    val previousMonth = YearMonth.now().minusMonths(1)\n    fun currentPaid(student: Student) = payments.filter { it.studentId == student.id && it.month.equals(thisMonth, true) }.sumOf { it.amount }\n    fun paidThroughPreviousMonth(student: Student): Int = payments\n        .filter { it.studentId == student.id }\n        .filter { monthKey(it.month)?.let { month -> !month.isAfter(previousMonth) } == true }\n        .sumOf { it.amount }\n    fun outstanding(student: Student): Int {'''
+          if old not in s: raise SystemExit('Missing payment helper block')
+          s = s.replace(old, new, 1)
+          old = '''    val paidStudents = students.count { currentPaid(it) >= it.monthlyFee }\n    val partialStudents = students.count { currentPaid(it) > 0 && currentPaid(it) < it.monthlyFee }\n    val unpaidStudents = students.count { currentPaid(it) == 0 }'''
+          new = '''    val paidStudents = students.count { outstanding(it) == 0 }\n    val partialStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) > 0 }\n    val unpaidStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) == 0 }'''
+          if old not in s: raise SystemExit('Missing dashboard counters')
+          s = s.replace(old, new, 1)
+          old = '''                "Paid" -> {\n                    val paid = payments\n                        .filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }\n                        .sumOf { it.amount }\n                    paid >= student.monthlyFee && student.monthlyFee > 0\n                }\n                "Due" -> {\n                    val paid = payments\n                        .filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }\n                        .sumOf { it.amount }\n                    paid < student.monthlyFee\n                }'''
+          new = '''                "Paid" -> outstandingFor(student) == 0\n                "Due" -> outstandingFor(student) > 0'''
+          if old not in s: raise SystemExit('Missing student payment filters')
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          print('Payment dashboard and filters fixed.')
+      - name: Restore normal workflow and commit fix
+        if: github.event.head_commit.message == 'Prepare payment dashboard fix'
+        shell: bash
+        run: |
+          cat > .github/workflows/verify-refactor.yml <<'EOF'
+          name: Verify Refactor Build
+
+          on:
+            push:
+              branches:
+                - refactor/student-card-v47
+            workflow_dispatch:
+
+          jobs:
+            build:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-java@v4
+                  with:
+                    distribution: temurin
+                    java-version: '17'
+                - name: Check Gradle project files
+                  run: |
+                    ls -la
+                    find . -maxdepth 3 -type f \( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' -o -name 'settings.gradle.kts' \) -print
+                - name: Build debug APK
+                  run: gradle assembleDebug --stacktrace
+          EOF
+          git rm -f .github/workflows/fix-payment-dashboard.yml .github/workflows/trigger-payment-dashboard-fix.yml || true
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt .github/workflows/verify-refactor.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fix payment dashboard and filters"
+          git push origin HEAD:refactor/student-card-v47
       - name: Build debug APK
+        if: github.event.head_commit.message != 'Prepare payment dashboard fix'
         run: gradle assembleDebug --stacktrace
