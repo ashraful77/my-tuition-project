@@ -21,3 +21,5 @@ elif old in s:
     print("Dashboard due cutoff applied successfully.")
 else:
     raise SystemExit("Dashboard outstanding calculation block not found.")
+
+# Trigger the approved dashboard due fix workflow.
