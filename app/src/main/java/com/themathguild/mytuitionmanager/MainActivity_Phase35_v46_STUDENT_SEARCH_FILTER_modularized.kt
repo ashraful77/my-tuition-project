@@ -149,16 +149,23 @@ private fun recentMonths(count: Long = 18): List<String> {
     }
 }
 
-fun eligibleFeeMonths(student: Student, existingPayments: List<Payment>): List<String> {
+fun eligibleFeeMonths(
+    student: Student,
+    existingPayments: List<Payment>,
+    allowAdvance: Boolean = false
+): List<String> {
     val join = monthKey(student.joiningMonth) ?: return emptyList()
-    val latestAllowed = YearMonth.now().plusMonths(1)
+    val now = YearMonth.now()
+    val latestAllowed = if (allowAdvance) now.plusMonths(12) else now.minusMonths(1)
     if (join.isAfter(latestAllowed)) return emptyList()
 
     val paidMonths = existingPayments.mapNotNull { monthKey(it.month) }.toSet()
     return buildList {
         var m = join
         while (!m.isAfter(latestAllowed)) {
-            if (m !in paidMonths) add(m.format(monthFormatter))
+            val normal = !m.isAfter(now.minusMonths(1))
+            val advance = allowAdvance && !m.isBefore(now)
+            if (m !in paidMonths && (normal || advance)) add(m.format(monthFormatter))
             m = m.plusMonths(1)
         }
     }
@@ -167,7 +174,8 @@ fun eligibleFeeMonths(student: Student, existingPayments: List<Payment>): List<S
 fun validateFeeCollection(
     student: Student,
     existingPayments: List<Payment>,
-    selectedMonths: List<String>
+    selectedMonths: List<String>,
+    allowAdvance: Boolean = false
 ): String? {
     if (student.monthlyFee <= 0) return "Monthly fee must be greater than ₹0."
     if (monthKey(student.joiningMonth) == null) return "Please enter a valid joining month."
@@ -176,7 +184,7 @@ fun validateFeeCollection(
     val duplicate = selectedMonths.groupingBy { it.lowercase() }.eachCount().any { it.value > 1 }
     if (duplicate) return "The same month cannot be selected twice."
 
-    val allowed = eligibleFeeMonths(student, existingPayments).toSet()
+    val allowed = eligibleFeeMonths(student, existingPayments, allowAdvance).toSet()
     val invalid = selectedMonths.filter { it !in allowed }
     if (invalid.isNotEmpty()) return "Payment not allowed for: ${invalid.joinToString(", ")}"
 
@@ -732,9 +740,9 @@ fun TuitionApp(store: LocalStore) {
                 student = s,
                 existingPayments = payments.filter { it.studentId == s.id },
                 onDismiss = { collectStudent = null }
-            ) { selectedMonths ->
+            ) { selectedMonths, allowAdvance ->
                 val existingForStudent = payments.filter { it.studentId == s.id }
-                val error = validateFeeCollection(s, existingForStudent, selectedMonths)
+                val error = validateFeeCollection(s, existingForStudent, selectedMonths, allowAdvance)
 
                 if (error != null) {
                     Toast.makeText(context, error, Toast.LENGTH_LONG).show()
@@ -2456,16 +2464,17 @@ fun CollectFeeDialog(
     student: Student,
     existingPayments: List<Payment>,
     onDismiss: () -> Unit,
-    onSave: (List<String>) -> Unit
+    onSave: (List<String>, Boolean) -> Unit
 ) {
-    val eligibleMonths = eligibleFeeMonths(student, existingPayments)
+    var allowAdvance by remember { mutableStateOf(false) }
+    val eligibleMonths = eligibleFeeMonths(student, existingPayments, allowAdvance)
 
     var selectedMonths by remember { mutableStateOf(emptySet<String>()) }
     val total = selectedMonths.size * student.monthlyFee
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Collect Fee") },
+        title = { Text(if (allowAdvance) "Pay in Advance" else "Collect Fee") },
         text = {
             Column(
                 Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
@@ -2473,11 +2482,21 @@ fun CollectFeeDialog(
             ) {
                 Text(student.name, fontWeight = FontWeight.Bold)
                 Text("Monthly fee: ₹${student.monthlyFee}")
-                Text("Select one or more eligible months.")
-                Text(
-                    "Allowed: joining month through next month. " +
-                        "A month can be collected only once."
-                )
+                if (!allowAdvance) {
+                    Text("Select unpaid fee months up to the previous month.")
+                    Text("Current month and future months require Pay in Advance.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(
+                        onClick = { selectedMonths = emptySet(); allowAdvance = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Pay in Advance") }
+                } else {
+                    Text("Select current or future months to pay in advance.")
+                    Text("Advance payment is available for up to 12 months ahead.", style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(
+                        onClick = { selectedMonths = emptySet(); allowAdvance = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { Text("Back to Normal Payment") }
+                }
 
                 if (eligibleMonths.isEmpty()) {
                     val joinValid = monthKey(student.joiningMonth) != null
@@ -2525,7 +2544,7 @@ fun CollectFeeDialog(
                     val ordered = selectedMonths.sortedWith(
                         compareBy<String> { monthKey(it)?.toString() ?: "" }
                     )
-                    onSave(ordered)
+                    onSave(ordered, allowAdvance)
                 }
             ) { Text("Save Payment") }
         },
