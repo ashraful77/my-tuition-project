@@ -17,6 +17,7 @@ jobs:
           from pathlib import Path
           p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
           s = p.read_text(encoding='utf-8')
+          changed = False
 
           old = '''fun eligibleFeeMonths(student: Student, existingPayments: List<Payment>): List<String> {
               val join = monthKey(student.joiningMonth) ?: return emptyList()
@@ -55,6 +56,7 @@ jobs:
           }'''
           if old in s:
               s = s.replace(old, new, 1)
+              changed = True
 
           old = '''fun validateFeeCollection(
               student: Student,
@@ -94,6 +96,7 @@ jobs:
           }'''
           if old in s:
               s = s.replace(old, new, 1)
+              changed = True
 
           old = '''            ) { selectedMonths ->
                 val existingForStudent = payments.filter { it.studentId == s.id }
@@ -101,25 +104,38 @@ jobs:
           new = '''            ) { selectedMonths, allowAdvance ->
                 val existingForStudent = payments.filter { it.studentId == s.id }
                 val error = validateFeeCollection(s, existingForStudent, selectedMonths, allowAdvance)'''
-          if old not in s:
-              raise SystemExit('Payment callback not found')
-          s = s.replace(old, new, 1)
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-          s = s.replace('''fun CollectFeeDialog(
+          old = '''fun CollectFeeDialog(
     student: Student,
     existingPayments: List<Payment>,
     onDismiss: () -> Unit,
     onSave: (List<String>) -> Unit
-) {''', '''fun CollectFeeDialog(
+) {'''
+          new = '''fun CollectFeeDialog(
     student: Student,
     existingPayments: List<Payment>,
     onDismiss: () -> Unit,
     onSave: (List<String>, Boolean) -> Unit
 ) {
-    var allowAdvance by remember { mutableStateOf(false) }''', 1)
+    var allowAdvance by remember { mutableStateOf(false) }'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-          s = s.replace('val eligibleMonths = eligibleFeeMonths(student, existingPayments)', 'val eligibleMonths = eligibleFeeMonths(student, existingPayments, allowAdvance)', 1)
-          s = s.replace('title = { Text("Collect Fee") },', 'title = { Text(if (allowAdvance) "Pay in Advance" else "Collect Fee") },', 1)
+          old = 'val eligibleMonths = eligibleFeeMonths(student, existingPayments)'
+          new = 'val eligibleMonths = eligibleFeeMonths(student, existingPayments, allowAdvance)'
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
+
+          old = 'title = { Text("Collect Fee") },'
+          new = 'title = { Text(if (allowAdvance) "Pay in Advance" else "Collect Fee") },'
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
           old = '''                Text("Select one or more eligible months.")
                 Text(
@@ -141,15 +157,30 @@ jobs:
                         modifier = Modifier.fillMaxWidth()
                     ) { Text("Back to Normal Payment") }
                 }'''
-          if old not in s:
-              raise SystemExit('Payment dialog text not found')
-          s = s.replace(old, new, 1)
-          if 'onSave(ordered, allowAdvance)' not in s:
-              s = s.replace('onSave(ordered)', 'onSave(ordered, allowAdvance)', 1)
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
+
+          old = 'onSave(ordered)'
+          new = 'onSave(ordered, allowAdvance)'
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
           p.write_text(s, encoding='utf-8')
-          print('Payment rule applied.')
+          print('payment rule changed:', changed)
           PY
+      - name: Commit payment rule if changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt
+          if git diff --cached --quiet; then
+            echo 'No payment rule commit needed.'
+          else
+            git commit -m 'Restrict normal payments and add explicit advance mode'
+            git push origin refactor/student-card-v47
+          fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
