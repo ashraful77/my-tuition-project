@@ -1,9 +1,7 @@
 name: Apply Payment Rule
 
 on:
-  push:
-    branches:
-      - refactor/student-card-v47
+  workflow_dispatch:
 
 permissions:
   contents: write
