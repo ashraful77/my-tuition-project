@@ -761,6 +761,7 @@ fun TuitionApp(store: LocalStore) {
             attendance = attendance,
             outstandingFor = { outstanding(it) },
             onDismiss = { },
+            onAddStudent = { guarded("addStudent", "Add Student") { addOpen = true } },
             onOpenProfile = { s -> selectedStudent = s },
             onCollect = { s -> guarded("payment", "Make Payment") { collectStudent = s } },
             onEdit = { s -> guarded("editStudent", "Edit Student") { editStudent = s } },
@@ -1689,6 +1690,7 @@ fun ManageStudentsDialog(
     attendance: List<AttendanceRecord>,
     outstandingFor: (Student) -> Int,
     onDismiss: () -> Unit,
+    onAddStudent: () -> Unit,
     onOpenProfile: (Student) -> Unit,
     onCollect: (Student) -> Unit,
     onEdit: (Student) -> Unit,
@@ -1703,6 +1705,8 @@ fun ManageStudentsDialog(
     var batchFilter by remember { mutableStateOf("All") }
     var classMenuOpen by remember { mutableStateOf(false) }
     var batchMenuOpen by remember { mutableStateOf(false) }
+    var sortMenuOpen by remember { mutableStateOf(false) }
+    var sortOption by remember { mutableStateOf("Name A–Z") }
 
     val classOptions = listOf("All") + students
         .map { it.className.trim() }
@@ -1715,9 +1719,12 @@ fun ManageStudentsDialog(
         .distinct()
         .sorted()
 
-    val filtered = students
-        .filter { it.status.equals(tab, true) }
-        .filter { studentSearch.isBlank() || it.name.contains(studentSearch.trim(), true) }
+    val tabStudents = students.filter { it.status.equals(tab, true) }
+    val paidCount = tabStudents.count { outstandingFor(it) == 0 }
+    val dueCount = tabStudents.count { outstandingFor(it) > 0 }
+
+    val filtered = tabStudents
+        .filter { studentSearch.isBlank() || listOf(it.name, it.phone, it.className, it.batch).any { value -> value.contains(studentSearch.trim(), true) } }
         .filter { classFilter == "All" || it.className == classFilter }
         .filter { batchFilter == "All" || it.batch == batchFilter }
         .filter { student ->
@@ -1727,16 +1734,25 @@ fun ManageStudentsDialog(
                 else -> true
             }
         }
-        .sortedBy { it.name.lowercase() }
+        .let { list ->
+            when (sortOption) {
+                "Name Z–A" -> list.sortedByDescending { it.name.lowercase() }
+                "Due high → low" -> list.sortedByDescending { outstandingFor(it) }
+                "Due low → high" -> list.sortedBy { outstandingFor(it) }
+                "Joining newest" -> list.sortedByDescending { monthKey(it.joiningMonth) ?: YearMonth.of(1900, 1) }
+                else -> list.sortedBy { it.name.lowercase() }
+            }
+        }
 
     FullScreenPage(
         onDismissRequest = onDismiss,
         title = {
-            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text("Students", fontWeight = FontWeight.Bold)
-                Text("${filtered.size} $tab students", style = MaterialTheme.typography.labelMedium)
+                Text("${tabStudents.size} $tab students", style = MaterialTheme.typography.labelMedium)
             }
         },
+        dismissButton = { FilledTonalButton(onClick = onAddStudent) { Text("＋ Add") } },
         text = {
             Column(
                 Modifier
@@ -1744,109 +1760,39 @@ fun ManageStudentsDialog(
                     .heightIn(max = 620.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    OutlinedTextField(
-                        value = studentSearch,
-                        onValueChange = { studentSearch = it },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        label = { Text("Search student") }
-                    )
-                    FilterChip(
-                        selected = filterOpen,
-                        onClick = { filterOpen = !filterOpen },
-                        label = { Text("Filter") }
-                    )
+                OutlinedTextField(
+                    value = studentSearch,
+                    onValueChange = { studentSearch = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search name, phone, class or batch") }
+                )
+
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("All" to tabStudents.size, "Paid" to paidCount, "Due" to dueCount).forEach { (option, count) ->
+                        FilterChip(selected = paymentFilter == option, onClick = { paymentFilter = option }, label = { Text("$option $count") }, modifier = Modifier.height(36.dp))
+                    }
                 }
 
-                if (filterOpen) {
-                    Card(Modifier.fillMaxWidth()) {
-                        Column(
-                            Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text("Filter students", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(5.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                listOf("All", "Paid", "Due").forEach { option ->
-                                    FilterChip(
-                                        selected = paymentFilter == option,
-                                        onClick = { paymentFilter = option },
-                                        label = { Text(option) },
-                                        modifier = Modifier.height(36.dp)
-                                    )
-                                }
-                            }
-
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(Modifier.weight(1f)) {
-                                    OutlinedButton(
-                                        onClick = { classMenuOpen = true },
-                                        modifier = Modifier.fillMaxWidth().height(42.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp)
-                                    ) {
-                                        Text("Class: $classFilter", maxLines = 1)
-                                    }
-                                    DropdownMenu(
-                                        expanded = classMenuOpen,
-                                        onDismissRequest = { classMenuOpen = false }
-                                    ) {
-                                        classOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text("Class: $option") },
-                                                onClick = { classFilter = option; classMenuOpen = false }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Box(Modifier.weight(1f)) {
-                                    OutlinedButton(
-                                        onClick = { batchMenuOpen = true },
-                                        modifier = Modifier.fillMaxWidth().height(42.dp),
-                                        contentPadding = PaddingValues(horizontal = 10.dp)
-                                    ) {
-                                        Text("Batch: $batchFilter", maxLines = 1)
-                                    }
-                                    DropdownMenu(
-                                        expanded = batchMenuOpen,
-                                        onDismissRequest = { batchMenuOpen = false }
-                                    ) {
-                                        batchOptions.forEach { option ->
-                                            DropdownMenuItem(
-                                                text = { Text("Batch: $option") },
-                                                onClick = { batchFilter = option; batchMenuOpen = false }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-
-                            if (paymentFilter != "All" || classFilter != "All" || batchFilter != "All") {
-                                TextButton(
-                                    onClick = {
-                                        paymentFilter = "All"
-                                        classFilter = "All"
-                                        batchFilter = "All"
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    modifier = Modifier.height(32.dp)
-                                ) { Text("Clear filters") }
-                            }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { batchMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Batch: $batchFilter", maxLines = 1) }
+                        DropdownMenu(expanded = batchMenuOpen, onDismissRequest = { batchMenuOpen = false }) { batchOptions.forEach { option -> DropdownMenuItem(text = { Text("Batch: $option") }, onClick = { batchFilter = option; batchMenuOpen = false }) } }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { classMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Class: $classFilter", maxLines = 1) }
+                        DropdownMenu(expanded = classMenuOpen, onDismissRequest = { classMenuOpen = false }) { classOptions.forEach { option -> DropdownMenuItem(text = { Text("Class: $option") }, onClick = { classFilter = option; classMenuOpen = false }) } }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { sortMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("⇅ $sortOption", maxLines = 1) }
+                        DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                            listOf("Name A–Z", "Name Z–A", "Due high → low", "Due low → high", "Joining newest").forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { sortOption = option; sortMenuOpen = false }) }
                         }
                     }
+                }
+
+                if (paymentFilter != "All" || classFilter != "All" || batchFilter != "All") {
+                    TextButton(onClick = { paymentFilter = "All"; classFilter = "All"; batchFilter = "All" }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)) { Text("Clear filters") }
                 }
 
                 Row(

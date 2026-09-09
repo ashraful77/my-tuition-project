@@ -12,7 +12,6 @@ import com.themathguild.mytuitionmanager.AttendanceRecord
 import com.themathguild.mytuitionmanager.Payment
 import com.themathguild.mytuitionmanager.Student
 import com.themathguild.mytuitionmanager.StatusBadge
-import com.themathguild.mytuitionmanager.currentMonth
 import com.themathguild.mytuitionmanager.monthKey
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -31,72 +30,39 @@ fun StudentCard(
     onEdit: (Student) -> Unit,
     onDelete: (Student) -> Unit
 ) {
-    val paid = payments.filter { it.studentId == student.id && it.month.equals(currentMonth(), true) }.sumOf { it.amount }
-
     val totalDue = run {
         val start = monthKey(student.joiningMonth)
-            ?: payments.filter { it.studentId == student.id }
-                .mapNotNull { monthKey(it.month) }
-                .minOrNull()
+            ?: payments.filter { it.studentId == student.id }.mapNotNull { monthKey(it.month) }.minOrNull()
             ?: YearMonth.now()
         val dueThrough = YearMonth.now().minusMonths(1)
         val studentPayments = payments.filter { it.studentId == student.id }
         var month = start
         var amount = 0
         while (!month.isAfter(dueThrough)) {
-            val monthPaid = studentPayments
-                .filter { it.month.equals(month.format(monthFormatter), true) }
-                .sumOf { it.amount }
+            val monthPaid = studentPayments.filter { it.month.equals(month.format(monthFormatter), true) }.sumOf { it.amount }
             amount += maxOf(0, student.monthlyFee - monthPaid)
             month = month.plusMonths(1)
         }
         amount
     }
-
-    val collectAmount = maxOf(0, student.monthlyFee - paid)
-    val paymentStatus = when {
-        totalDue == 0 && student.monthlyFee > 0 -> "PAID"
-        paid > 0 -> "PARTIAL"
-        else -> "DUE"
-    }
+    val paymentStatus = if (totalDue == 0 && student.monthlyFee > 0) "PAID" else "DUE"
 
     Card(onClick = { onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(student.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                     Text("Class ${student.className}  •  Batch ${student.batch.ifBlank { "—" }}", style = MaterialTheme.typography.bodyMedium)
                 }
-                StatusBadge(paymentStatus) { onOpenProfile(student) }
+                TextButton(onClick = { onEdit(student) }) { Text("Edit", fontWeight = FontWeight.SemiBold) }
             }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 StatusBadge(student.status)
-                if (totalDue > 0) {
-                    Text(
-                        "Due ₹$totalDue",
-                        color = Color(0xFFC62828),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
+                if (paymentStatus == "PAID") StatusBadge("PAID")
+                else Text("Due ₹$totalDue", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
             }
-            HorizontalDivider()
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column { Text("Monthly fee", style = MaterialTheme.typography.labelSmall); Text("₹${student.monthlyFee}", fontWeight = FontWeight.SemiBold) }
-                Column(horizontalAlignment = Alignment.End) { Text("Joined", style = MaterialTheme.typography.labelSmall); Text(student.joiningMonth.ifBlank { "—" }, fontWeight = FontWeight.SemiBold) }
-            }
-            Row(Modifier.fillMaxWidth()) {
-                Text("Tap card to see full profile", style = MaterialTheme.typography.bodySmall)
-            }
-            if (student.phone.isNotBlank()) Text("☎ ${student.phone}", style = MaterialTheme.typography.bodySmall)
-            if (isActiveTab) {
-                FilledTonalButton(onClick = { onCollect(student) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (collectAmount > 0) "Collect Fee • ₹$collectAmount" else "View / Collect Fee")
-                }
-            }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = { onEdit(student) }) { Text("Edit") }
-                TextButton(onClick = { onDelete(student) }) { Text("Delete") }
+            FilledTonalButton(onClick = { if (isActiveTab) onCollect(student) else onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (isActiveTab && paymentStatus != "PAID") "Collect Fee" else "View Profile", fontWeight = FontWeight.Bold)
             }
         }
     }
