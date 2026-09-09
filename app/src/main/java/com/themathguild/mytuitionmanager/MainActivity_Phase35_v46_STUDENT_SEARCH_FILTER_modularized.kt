@@ -142,6 +142,28 @@ fun monthKey(month: String): YearMonth? = try {
 
 fun money(value: Int) = "₹$value"
 
+fun routineTimeMinutes(value: String): Int {
+    val match = Regex("(\\d{1,2})[:.](\\d{2})\\s*([AaPp][Mm])?").find(value.trim()) ?: return Int.MAX_VALUE
+    var hour = match.groupValues[1].toIntOrNull() ?: return Int.MAX_VALUE
+    val minute = match.groupValues[2].toIntOrNull() ?: return Int.MAX_VALUE
+    val suffix = match.groupValues[3]
+    if (suffix.isNotBlank()) {
+        hour = when {
+            suffix.equals("PM", true) && hour != 12 -> hour + 12
+            suffix.equals("AM", true) && hour == 12 -> 0
+            else -> hour
+        }
+    }
+    return hour * 60 + minute
+}
+
+fun sortedRoutinesByTime(items: List<BatchRoutine>): List<BatchRoutine> =
+    items.sortedWith(
+        compareBy<BatchRoutine> { routineTimeMinutes(it.start) }
+            .thenBy { routineTimeMinutes(it.end) }
+            .thenBy { it.batch.lowercase(Locale.getDefault()) }
+    )
+
 private fun recentMonths(count: Long = 18): List<String> {
     val now = YearMonth.now()
     return (0 until count.toInt()).map {
@@ -499,7 +521,17 @@ fun TuitionApp(store: LocalStore) {
     val partialStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) > 0 }
     val unpaidStudents = students.count { outstanding(it) > 0 && paidThroughPreviousMonth(it) == 0 }
     val totalOutstanding = students.sumOf { outstanding(it) }
-    val totalCollected = payments.filter { it.month.equals(thisMonth, true) }.sumOf { it.amount }
+    val totalCollected = payments.filter { payment ->
+        try {
+            val collectedDate = LocalDate.parse(
+                payment.date,
+                DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
+            )
+            YearMonth.from(collectedDate) == YearMonth.now()
+        } catch (_: Exception) {
+            false
+        }
+    }.sumOf { it.amount }
     val expectedThisMonth = students.sumOf { it.monthlyFee }
     val batches = listOf("All") + (batchList.map { it.name } + students.map { it.batch }).filter { it.isNotBlank() }.distinct().sorted()
     val classes = listOf("All") + students.map { it.className }.filter { it.isNotBlank() }.distinct().sorted()
@@ -671,14 +703,14 @@ fun TuitionApp(store: LocalStore) {
 
                 item {
                     val dayName = SimpleDateFormat("EEEE", Locale.getDefault()).format(Date())
-                    val todayRoutines = routines.filter { it.day.equals(dayName, true) }
+                    val todayRoutines = sortedRoutinesByTime(routines.filter { it.day.equals(dayName, true) })
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween, verticalAlignment=Alignment.CenterVertically) {
                                 Column { Text("Today’s Work", fontWeight=FontWeight.Bold); Text("$dayName • ${todayRoutines.size} scheduled batch${if(todayRoutines.size==1) "" else "es"}", style=MaterialTheme.typography.labelSmall) }
                                 TextButton(onClick={todayWorkOpen=true}){Text("View") }
                             }
-                            todayRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
+                            todayRoutines.forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
                             if(todayRoutines.isEmpty()) Text("No routine set for today. Use Live Batch or Settings to add one.", style=MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -687,12 +719,12 @@ fun TuitionApp(store: LocalStore) {
                 item {
                     val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }.time
                     val tomorrowDayName = SimpleDateFormat("EEEE", Locale.getDefault()).format(tomorrow)
-                    val tomorrowRoutines = routines.filter { it.day.equals(tomorrowDayName, true) }
+                    val tomorrowRoutines = sortedRoutinesByTime(routines.filter { it.day.equals(tomorrowDayName, true) })
                     Card(Modifier.fillMaxWidth()) {
                         Column(Modifier.padding(12.dp)) {
                             Text("Tomorrow’s Work", fontWeight=FontWeight.Bold)
                             Text("$tomorrowDayName • ${tomorrowRoutines.size} scheduled batch${if(tomorrowRoutines.size==1) "" else "es"}", style=MaterialTheme.typography.labelSmall)
-                            tomorrowRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
+                            tomorrowRoutines.forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style=MaterialTheme.typography.bodySmall) }
                             if(tomorrowRoutines.isEmpty()) Text("No routine set for tomorrow. Use Live Batch or Settings to add one.", style=MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -1092,7 +1124,7 @@ fun SecurityControlsDialog(store:LocalStore,onDismiss:()->Unit){
 
 @Composable
 fun TodayWorkDialog(routines:List<BatchRoutine>,notes:List<BatchNote>,onDismiss:()->Unit,onLive:()->Unit){
-    val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=routines.filter{it.day.equals(day,true)}
+    val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=sortedRoutinesByTime(routines.filter{it.day.equals(day,true)})
     AlertDialog(onDismissRequest=onDismiss,title={Text("Today’s Work",fontWeight=FontWeight.Bold)},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         if(rs.isEmpty())Text("No tuition routine scheduled today.") else rs.forEach{Text("🟢 ${it.start}–${it.end} • ${it.batch}")}
         Text("Recent Live Batch notes",fontWeight=FontWeight.Bold);notes.takeLast(8).reversed().forEach{Text("${it.date} • ${it.batch} • ${it.type}: ${it.text}",style=MaterialTheme.typography.bodySmall)}
