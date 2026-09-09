@@ -7,6 +7,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.themathguild.mytuitionmanager.AttendanceRecord
 import com.themathguild.mytuitionmanager.Payment
 import com.themathguild.mytuitionmanager.Student
 import com.themathguild.mytuitionmanager.StatusBadge
@@ -21,10 +22,12 @@ private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENG
 fun StudentCard(
     student: Student,
     payments: List<Payment>,
+    attendance: List<AttendanceRecord>,
     isActiveTab: Boolean,
     onOpenProfile: (Student) -> Unit,
     onCollect: (Student) -> Unit,
-    onEdit: (Student) -> Unit
+    onEdit: (Student) -> Unit,
+    onDelete: (Student) -> Unit
 ) {
     val totalDue = run {
         val start = monthKey(student.joiningMonth)
