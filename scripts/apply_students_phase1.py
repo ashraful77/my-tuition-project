@@ -1,0 +1,185 @@
+from pathlib import Path
+
+main = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
+s = main.read_text()
+s = s.replace('    onDismiss: () -> Unit,\n    onOpenProfile: (Student) -> Unit,', '    onDismiss: () -> Unit,\n    onAddStudent: () -> Unit,\n    onOpenProfile: (Student) -> Unit,', 1)
+s = s.replace('    var batchMenuOpen by remember { mutableStateOf(false) }\n', '    var batchMenuOpen by remember { mutableStateOf(false) }\n    var sortMenuOpen by remember { mutableStateOf(false) }\n    var sortOption by remember { mutableStateOf("Name A–Z") }\n', 1)
+old = '''    val filtered = students
+        .filter { it.status.equals(tab, true) }
+        .filter { studentSearch.isBlank() || it.name.contains(studentSearch.trim(), true) }
+        .filter { classFilter == "All" || it.className == classFilter }
+        .filter { batchFilter == "All" || it.batch == batchFilter }
+        .filter { student ->
+            when (paymentFilter) {
+                "Paid" -> outstandingFor(student) == 0
+                "Due" -> outstandingFor(student) > 0
+                else -> true
+            }
+        }
+        .sortedBy { it.name.lowercase() }
+'''
+new = '''    val tabStudents = students.filter { it.status.equals(tab, true) }
+    val paidCount = tabStudents.count { outstandingFor(it) == 0 }
+    val dueCount = tabStudents.count { outstandingFor(it) > 0 }
+
+    val filtered = tabStudents
+        .filter { studentSearch.isBlank() || listOf(it.name, it.phone, it.className, it.batch).any { value -> value.contains(studentSearch.trim(), true) } }
+        .filter { classFilter == "All" || it.className == classFilter }
+        .filter { batchFilter == "All" || it.batch == batchFilter }
+        .filter { student ->
+            when (paymentFilter) {
+                "Paid" -> outstandingFor(student) == 0
+                "Due" -> outstandingFor(student) > 0
+                else -> true
+            }
+        }
+        .let { list ->
+            when (sortOption) {
+                "Name Z–A" -> list.sortedByDescending { it.name.lowercase() }
+                "Due high → low" -> list.sortedByDescending { outstandingFor(it) }
+                "Due low → high" -> list.sortedBy { outstandingFor(it) }
+                "Joining newest" -> list.sortedByDescending { monthKey(it.joiningMonth) ?: YearMonth.of(1900, 1) }
+                else -> list.sortedBy { it.name.lowercase() }
+            }
+        }
+'''
+if old not in s: raise SystemExit('filtered block not found')
+s = s.replace(old, new, 1)
+start = s.index('                Row(\n                    Modifier.fillMaxWidth(),\n                    verticalAlignment = Alignment.CenterVertically,\n                    horizontalArrangement = Arrangement.spacedBy(6.dp)\n                ) {', s.index('fun ManageStudentsDialog'))
+end = s.index('                Row(\n                    Modifier\n                        .fillMaxWidth()\n                        .horizontalScroll', start)
+ui = '''                OutlinedTextField(
+                    value = studentSearch,
+                    onValueChange = { studentSearch = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search name, phone, class or batch") }
+                )
+
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("All" to tabStudents.size, "Paid" to paidCount, "Due" to dueCount).forEach { (option, count) ->
+                        FilterChip(selected = paymentFilter == option, onClick = { paymentFilter = option }, label = { Text("$option $count") }, modifier = Modifier.height(36.dp))
+                    }
+                }
+
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { batchMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Batch: $batchFilter", maxLines = 1) }
+                        DropdownMenu(expanded = batchMenuOpen, onDismissRequest = { batchMenuOpen = false }) { batchOptions.forEach { option -> DropdownMenuItem(text = { Text("Batch: $option") }, onClick = { batchFilter = option; batchMenuOpen = false }) } }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { classMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("Class: $classFilter", maxLines = 1) }
+                        DropdownMenu(expanded = classMenuOpen, onDismissRequest = { classMenuOpen = false }) { classOptions.forEach { option -> DropdownMenuItem(text = { Text("Class: $option") }, onClick = { classFilter = option; classMenuOpen = false }) } }
+                    }
+                    Box(Modifier.weight(1f)) {
+                        OutlinedButton(onClick = { sortMenuOpen = true }, modifier = Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 8.dp)) { Text("⇅ $sortOption", maxLines = 1) }
+                        DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                            listOf("Name A–Z", "Name Z–A", "Due high → low", "Due low → high", "Joining newest").forEach { option -> DropdownMenuItem(text = { Text(option) }, onClick = { sortOption = option; sortMenuOpen = false }) }
+                        }
+                    }
+                }
+
+                if (paymentFilter != "All" || classFilter != "All" || batchFilter != "All") {
+                    TextButton(onClick = { paymentFilter = "All"; classFilter = "All"; batchFilter = "All" }, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp), modifier = Modifier.height(32.dp)) { Text("Clear filters") }
+                }
+
+'''
+s = s[:start] + ui + s[end:]
+title = '''        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("Students", fontWeight = FontWeight.Bold)
+                Text("${filtered.size} $tab students", style = MaterialTheme.typography.labelMedium)
+            }
+        },
+'''
+replacement = '''        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Students", fontWeight = FontWeight.Bold)
+                Text("${tabStudents.size} $tab students", style = MaterialTheme.typography.labelMedium)
+            }
+        },
+        dismissButton = { FilledTonalButton(onClick = onAddStudent) { Text("＋ Add") } },
+'''
+if title not in s: raise SystemExit('title block not found')
+s = s.replace(title, replacement, 1)
+parent = '''            onDismiss = { },
+            onOpenProfile = { s -> selectedStudent = s },
+'''
+parent2 = '''            onDismiss = { },
+            onAddStudent = { guarded("addStudent", "Add Student") { addOpen = true } },
+            onOpenProfile = { s -> selectedStudent = s },
+'''
+if parent not in s: raise SystemExit('parent block not found')
+s = s.replace(parent, parent2, 1)
+main.write_text(s)
+
+card = Path('app/src/main/java/com/themathguild/mytuitionmanager/components/StudentCard.kt')
+card.write_text('''package com.themathguild.mytuitionmanager.components
+
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.themathguild.mytuitionmanager.AttendanceRecord
+import com.themathguild.mytuitionmanager.Payment
+import com.themathguild.mytuitionmanager.Student
+import com.themathguild.mytuitionmanager.StatusBadge
+import com.themathguild.mytuitionmanager.monthKey
+import java.time.YearMonth
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+private val monthFormatter = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+
+@Composable
+fun StudentCard(
+    student: Student,
+    payments: List<Payment>,
+    attendance: List<AttendanceRecord>,
+    isActiveTab: Boolean,
+    onOpenProfile: (Student) -> Unit,
+    onCollect: (Student) -> Unit,
+    onEdit: (Student) -> Unit,
+    onDelete: (Student) -> Unit
+) {
+    val totalDue = run {
+        val start = monthKey(student.joiningMonth)
+            ?: payments.filter { it.studentId == student.id }.mapNotNull { monthKey(it.month) }.minOrNull()
+            ?: YearMonth.now()
+        val dueThrough = YearMonth.now().minusMonths(1)
+        val studentPayments = payments.filter { it.studentId == student.id }
+        var month = start
+        var amount = 0
+        while (!month.isAfter(dueThrough)) {
+            val monthPaid = studentPayments.filter { it.month.equals(month.format(monthFormatter), true) }.sumOf { it.amount }
+            amount += maxOf(0, student.monthlyFee - monthPaid)
+            month = month.plusMonths(1)
+        }
+        amount
+    }
+    val paymentStatus = if (totalDue == 0 && student.monthlyFee > 0) "PAID" else "DUE"
+
+    Card(onClick = { onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(student.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text("Class ${student.className}  •  Batch ${student.batch.ifBlank { "—" }}", style = MaterialTheme.typography.bodyMedium)
+                }
+                TextButton(onClick = { onEdit(student) }) { Text("Edit", fontWeight = FontWeight.SemiBold) }
+            }
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                StatusBadge(student.status)
+                if (paymentStatus == "PAID") StatusBadge("PAID")
+                else Text("Due ₹$totalDue", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+            }
+            FilledTonalButton(onClick = { if (isActiveTab) onCollect(student) else onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (isActiveTab && paymentStatus != "PAID") "Collect Fee" else "View Profile", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+''')
