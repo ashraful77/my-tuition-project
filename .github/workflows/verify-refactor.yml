@@ -41,20 +41,16 @@ jobs:
           if old not in s: raise SystemExit('today routines target not found')
           s = s.replace(old, new, 1)
 
-          old = 'todayRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style = MaterialTheme.typography.bodySmall) }'
-          new = 'todayRoutines.forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style = MaterialTheme.typography.bodySmall) }'
-          if old not in s: raise SystemExit('today take target not found')
-          s = s.replace(old, new, 1)
+          if 'todayRoutines.take(3).forEach' not in s: raise SystemExit('today take target not found')
+          s = s.replace('todayRoutines.take(3).forEach', 'todayRoutines.forEach', 1)
 
           old = 'val tomorrowRoutines = routines.filter { it.day.equals(tomorrowDayName, true) }'
           new = 'val tomorrowRoutines = sortedRoutinesByTime(routines.filter { it.day.equals(tomorrowDayName, true) })'
           if old not in s: raise SystemExit('tomorrow routines target not found')
           s = s.replace(old, new, 1)
 
-          old = 'tomorrowRoutines.take(3).forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style = MaterialTheme.typography.bodySmall) }'
-          new = 'tomorrowRoutines.forEach { Text("🟢 ${it.start}–${it.end} • ${it.batch}", style = MaterialTheme.typography.bodySmall) }'
-          if old not in s: raise SystemExit('tomorrow take target not found')
-          s = s.replace(old, new, 1)
+          if 'tomorrowRoutines.take(3).forEach' not in s: raise SystemExit('tomorrow take target not found')
+          s = s.replace('tomorrowRoutines.take(3).forEach', 'tomorrowRoutines.forEach', 1)
 
           old = 'val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=routines.filter{it.day.equals(day,true)}'
           new = 'val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=sortedRoutinesByTime(routines.filter{it.day.equals(day,true)})'
