@@ -5,7 +5,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.themathguild.mytuitionmanager.AttendanceRecord
@@ -48,6 +47,7 @@ fun StudentCard(
         amount
     }
     val paymentStatus = if (totalDue == 0 && student.monthlyFee > 0) "PAID" else "DUE"
+    val canCollect = isActiveTab && paymentStatus != "PAID"
 
     Card(
         onClick = { onOpenProfile(student) },
@@ -102,18 +102,22 @@ fun StudentCard(
                 }
             }
 
-            FilledTonalButton(
-                onClick = {
-                    if (isActiveTab && paymentStatus != "PAID") onCollect(student)
-                    else onOpenProfile(student)
-                },
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(vertical = 11.dp)
-            ) {
-                Text(
-                    if (isActiveTab && paymentStatus != "PAID") "Collect Fee" else "View Profile",
-                    fontWeight = FontWeight.Bold
-                )
+            if (canCollect) {
+                Button(
+                    onClick = { onCollect(student) },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) {
+                    Text("Collect Fee", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                OutlinedButton(
+                    onClick = { onOpenProfile(student) },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(vertical = 11.dp)
+                ) {
+                    Text("View Profile", fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
