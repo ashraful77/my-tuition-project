@@ -6,9 +6,6 @@ on:
       - refactor/student-card-v47
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,54 +15,6 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Apply approved dashboard fix once
-        if: ${{ hashFiles('.github/workflows/apply-dashboard-work-fix.yml') != '' }}
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt')
-          s = p.read_text()
-
-          old = '''fun money(value: Int) = "₹$value"\n\nprivate fun recentMonths'''
-          new = '''fun money(value: Int) = "₹$value"\n\nfun routineTimeMinutes(value: String): Int {\n    val match = Regex("(\\\\d{1,2})[:.](\\\\d{2})\\\\s*([AaPp][Mm])?").find(value.trim()) ?: return Int.MAX_VALUE\n    var hour = match.groupValues[1].toIntOrNull() ?: return Int.MAX_VALUE\n    val minute = match.groupValues[2].toIntOrNull() ?: return Int.MAX_VALUE\n    val suffix = match.groupValues[3]\n    if (suffix.isNotBlank()) {\n        hour = when {\n            suffix.equals("PM", true) && hour != 12 -> hour + 12\n            suffix.equals("AM", true) && hour == 12 -> 0\n            else -> hour\n        }\n    }\n    return hour * 60 + minute\n}\n\nfun sortedRoutinesByTime(items: List<BatchRoutine>): List<BatchRoutine> =\n    items.sortedWith(\n        compareBy<BatchRoutine> { routineTimeMinutes(it.start) }\n            .thenBy { routineTimeMinutes(it.end) }\n            .thenBy { it.batch.lowercase(Locale.getDefault()) }\n    )\n\nprivate fun recentMonths'''
-          if old not in s: raise SystemExit('helper insertion target not found')
-          s = s.replace(old, new, 1)
-
-          old = 'val totalCollected = payments.filter { it.month.equals(thisMonth, true) }.sumOf { it.amount }'
-          new = '''val totalCollected = payments.filter { payment ->\n        try {\n            val collectedDate = LocalDate.parse(\n                payment.date,\n                DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())\n            )\n            YearMonth.from(collectedDate) == YearMonth.now()\n        } catch (_: Exception) {\n            false\n        }\n    }.sumOf { it.amount }'''
-          if old not in s: raise SystemExit('collection target not found')
-          s = s.replace(old, new, 1)
-
-          old = 'val todayRoutines = routines.filter { it.day.equals(dayName, true) }'
-          new = 'val todayRoutines = sortedRoutinesByTime(routines.filter { it.day.equals(dayName, true) })'
-          if old not in s: raise SystemExit('today routines target not found')
-          s = s.replace(old, new, 1)
-
-          if 'todayRoutines.take(3).forEach' not in s: raise SystemExit('today take target not found')
-          s = s.replace('todayRoutines.take(3).forEach', 'todayRoutines.forEach', 1)
-
-          old = 'val tomorrowRoutines = routines.filter { it.day.equals(tomorrowDayName, true) }'
-          new = 'val tomorrowRoutines = sortedRoutinesByTime(routines.filter { it.day.equals(tomorrowDayName, true) })'
-          if old not in s: raise SystemExit('tomorrow routines target not found')
-          s = s.replace(old, new, 1)
-
-          if 'tomorrowRoutines.take(3).forEach' not in s: raise SystemExit('tomorrow take target not found')
-          s = s.replace('tomorrowRoutines.take(3).forEach', 'tomorrowRoutines.forEach', 1)
-
-          old = 'val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=routines.filter{it.day.equals(day,true)}'
-          new = 'val day=SimpleDateFormat("EEEE",Locale.getDefault()).format(Date());val rs=sortedRoutinesByTime(routines.filter{it.day.equals(day,true)})'
-          if old not in s: raise SystemExit('dialog routine target not found')
-          s = s.replace(old, new, 1)
-
-          p.write_text(s)
-          PY
-          rm -f .github/workflows/apply-dashboard-work-fix.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/src/main/java/com/themathguild/mytuitionmanager/MainActivity_Phase35_v46_STUDENT_SEARCH_FILTER_modularized.kt .github/workflows/verify-refactor.yml .github/workflows/apply-dashboard-work-fix.yml
-          git commit -m "Fix dashboard collection and work ordering"
-          git push origin HEAD:refactor/student-card-v47
-
       - name: Check Gradle project files
         run: |
           ls -la
