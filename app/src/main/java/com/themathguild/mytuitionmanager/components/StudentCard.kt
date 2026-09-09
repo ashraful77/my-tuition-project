@@ -39,7 +39,9 @@ fun StudentCard(
         var month = start
         var amount = 0
         while (!month.isAfter(dueThrough)) {
-            val monthPaid = studentPayments.filter { it.month.equals(month.format(monthFormatter), true) }.sumOf { it.amount }
+            val monthPaid = studentPayments
+                .filter { it.month.equals(month.format(monthFormatter), true) }
+                .sumOf { it.amount }
             amount += maxOf(0, student.monthlyFee - monthPaid)
             month = month.plusMonths(1)
         }
@@ -47,22 +49,71 @@ fun StudentCard(
     }
     val paymentStatus = if (totalDue == 0 && student.monthlyFee > 0) "PAID" else "DUE"
 
-    Card(onClick = { onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Card(
+        onClick = { onOpenProfile(student) },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Column(Modifier.weight(1f)) {
-                    Text(student.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text("Class ${student.className}  •  Batch ${student.batch.ifBlank { "—" }}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        student.name,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Text(
+                        "Class ${student.className}  •  Batch ${student.batch.ifBlank { "—" }}",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
                 }
-                TextButton(onClick = { onEdit(student) }) { Text("Edit", fontWeight = FontWeight.SemiBold) }
+                TextButton(onClick = { onEdit(student) }) {
+                    Text("Edit", fontWeight = FontWeight.SemiBold)
+                }
             }
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 StatusBadge(student.status)
-                if (paymentStatus == "PAID") StatusBadge("PAID")
-                else Text("Due ₹$totalDue", color = Color(0xFFC62828), fontWeight = FontWeight.Bold)
+                if (paymentStatus == "PAID") {
+                    StatusBadge("PAID")
+                } else {
+                    Surface(
+                        shape = MaterialTheme.shapes.small,
+                        color = MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Text(
+                            "DUE  ₹$totalDue",
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
             }
-            FilledTonalButton(onClick = { if (isActiveTab) onCollect(student) else onOpenProfile(student) }, modifier = Modifier.fillMaxWidth()) {
-                Text(if (isActiveTab && paymentStatus != "PAID") "Collect Fee" else "View Profile", fontWeight = FontWeight.Bold)
+
+            FilledTonalButton(
+                onClick = {
+                    if (isActiveTab && paymentStatus != "PAID") onCollect(student)
+                    else onOpenProfile(student)
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(vertical = 11.dp)
+            ) {
+                Text(
+                    if (isActiveTab && paymentStatus != "PAID") "Collect Fee" else "View Profile",
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
     }
