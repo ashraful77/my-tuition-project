@@ -108,7 +108,7 @@ fun StudentCard(
                     modifier = Modifier.fillMaxWidth(),
                     contentPadding = PaddingValues(vertical = 11.dp)
                 ) {
-                    Text("Collect Fee", fontWeight = FontWeight.Bold)
+                    Text("Collect Fee  •  ₹$totalDue", fontWeight = FontWeight.Bold)
                 }
             } else {
                 OutlinedButton(
