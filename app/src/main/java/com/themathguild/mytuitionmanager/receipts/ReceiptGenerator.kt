@@ -237,7 +237,7 @@ fun createReceiptPdf(
     }
     fun labelValue(label: String, value: String, x: Float, y: Float) {
         text(label.uppercase(), x, y, 7.5f, true, muted)
-        text(value, x, y + 17f, 10.5f, true, navy)
+        text(value, x, y + 12f, 10.5f, true, navy)
     }
 
     fill(left, 30f, right, 113f, navy)
@@ -265,27 +265,27 @@ fun createReceiptPdf(
     labelValue("Joining month", student.joiningMonth.ifBlank { "Not provided" }, left + 12f, 261f)
     labelValue("Monthly fee", "₹${student.monthlyFee}", 310f, 261f)
 
-    text("PAYMENT DETAILS", left, 304f, 10f, true, navy)
-    fill(left, 314f, right, 340f, navy)
-    text("FEE MONTH", left + 12f, 331f, 8f, true, Color.WHITE)
-    text("DATE", 335f, 331f, 8f, true, Color.WHITE)
-    text("AMOUNT", 474f, 331f, 8f, true, Color.WHITE)
+    text("PAYMENT DETAILS", left, 318f, 10f, true, navy)
+    fill(left, 328f, right, 354f, navy)
+    text("FEE MONTH", left + 12f, 345f, 8f, true, Color.WHITE)
+    text("DATE", 335f, 345f, 8f, true, Color.WHITE)
+    text("AMOUNT", 474f, 345f, 8f, true, Color.WHITE)
     val visibleRows = sorted.take(5)
     visibleRows.forEachIndexed { index, payment ->
-        val top = 340f + index * 27f
+        val top = 354f + index * 29f
         if (index % 2 == 0) fill(left, top, right, top + 27f, Color.rgb(249, 250, 252))
         line(left, top + 27f, right, top + 27f)
-        text(payment.month.take(32), left + 12f, top + 18f, 9.5f, index == 0)
-        text(payment.date, 335f, top + 18f, 9f)
-        text("₹${payment.amount}", 474f, top + 18f, 10f, true, navy)
+        text(payment.month.take(32), left + 12f, top + 19f, 9.5f, index == 0)
+        text(payment.date, 335f, top + 19f, 9f)
+        text("₹${payment.amount}", 474f, top + 19f, 10f, true, navy)
     }
-    var detailsBottom = 340f + maxOf(1, visibleRows.size) * 27f
+    var detailsBottom = 354f + maxOf(1, visibleRows.size) * 29f
     if (sorted.size > visibleRows.size) {
         fill(left, detailsBottom, right, detailsBottom + 25f, paleBlue)
         text("+ ${sorted.size - visibleRows.size} more month(s) recorded in payment history", left + 12f, detailsBottom + 17f, 8.5f, false, muted)
         detailsBottom += 25f
     }
-    line(left, 314f, left, detailsBottom); line(right, 314f, right, detailsBottom)
+    line(left, 328f, left, detailsBottom); line(right, 328f, right, detailsBottom)
 
     val totalTop = detailsBottom + 22f
     fill(left, totalTop, right, totalTop + 64f, if (isPaid) paleGreen else paleBlue)
