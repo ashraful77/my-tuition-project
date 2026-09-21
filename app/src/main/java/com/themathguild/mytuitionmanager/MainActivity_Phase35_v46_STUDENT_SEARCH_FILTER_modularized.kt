@@ -115,12 +115,12 @@ data class BatchNote(
 )
 
 data class TuitionProfile(
-    val tuitionName: String = "The Math Guide",
+    val tuitionName: String = "",
     val tagline: String = "Tuition & Academic Support",
-    val teacherName: String = "Ashraful Hoque",
-    val qualification: String = "B.SC Maths",
-    val phone: String = "9732956571",
-    val address: String = "Jatarpur, Murshidabad, West Bengal, 742147"
+    val teacherName: String = "",
+    val qualification: String = "",
+    val phone: String = "",
+    val address: String = ""
 )
 
 
@@ -272,11 +272,11 @@ fun exportBackup(context: Context): Uri {
     val prefs = context.getSharedPreferences("tuition_data", Context.MODE_PRIVATE)
     val backupDate = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date())
     val profile = JSONObject().apply {
-        put("tuitionName", prefs.getString("tuitionName", "The Math Guide") ?: "The Math Guide")
+        put("tuitionName", prefs.getString("tuitionName", "") ?: "")
         put("tagline", prefs.getString("tuitionTagline", "Tuition & Academic Support") ?: "Tuition & Academic Support")
-        put("teacherName", prefs.getString("teacherName", "Ashraful Hoque") ?: "Ashraful Hoque")
-        put("qualification", prefs.getString("qualification", "B.SC Maths") ?: "B.SC Maths")
-        put("phone", prefs.getString("tuitionPhone", "9732956571") ?: "9732956571")
+        put("teacherName", prefs.getString("teacherName", "") ?: "")
+        put("qualification", prefs.getString("qualification", "") ?: "")
+        put("phone", prefs.getString("tuitionPhone", "") ?: "")
         put("address", prefs.getString("tuitionAddress", "Jatarpur, Murshidabad, West Bengal, 742147")
             ?: "Jatarpur, Murshidabad, West Bengal, 742147")
     }
@@ -361,10 +361,7 @@ fun importBackup(context: Context, uri: Uri): Boolean {
                 .putString("tuitionPhone", profile.optString("phone", "9732956571"))
                 .putString(
                     "tuitionAddress",
-                    profile.optString(
-                        "address",
-                        "Jatarpur, Murshidabad, West Bengal, 742147"
-                    )
+                    profile.optString("address", "")
                 )
         }
 
@@ -625,12 +622,22 @@ fun TuitionApp(store: LocalStore) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.developer_photo),
-                                    contentDescription = "Ashraful Hoque",
-                                    modifier = Modifier.size(42.dp).clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
+                                Surface(
+                                    modifier = Modifier.size(42.dp),
+                                    shape = CircleShape,
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(
+                                            tuitionProfile.teacherName
+                                                .trim()
+                                                .firstOrNull()
+                                                ?.uppercase()
+                                                ?: "T",
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
                                 Column(Modifier.weight(1f)) {
                                     Text(tuitionProfile.teacherName, fontWeight = FontWeight.Bold)
                                     Text(
