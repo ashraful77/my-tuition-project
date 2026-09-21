@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - refactor/student-card-v47
 
 jobs:
   build:
