@@ -140,13 +140,12 @@ class LocalStore(context: Context) {
 
     fun loadTuitionProfile(): TuitionProfile {
         return TuitionProfile(
-            tuitionName = prefs.getString("tuitionName", "The Math Guide") ?: "The Math Guide",
+            tuitionName = prefs.getString("tuitionName", "") ?: "",
             tagline = prefs.getString("tuitionTagline", "Tuition & Academic Support") ?: "Tuition & Academic Support",
-            teacherName = prefs.getString("teacherName", "Ashraful Hoque") ?: "Ashraful Hoque",
-            qualification = prefs.getString("qualification", "B.SC Maths") ?: "B.SC Maths",
-            phone = prefs.getString("tuitionPhone", "9732956571") ?: "9732956571",
-            address = prefs.getString("tuitionAddress", "Jatarpur, Murshidabad, West Bengal, 742147")
-                ?: "Jatarpur, Murshidabad, West Bengal, 742147"
+            teacherName = prefs.getString("teacherName", "") ?: "",
+            qualification = prefs.getString("qualification", "") ?: "",
+            phone = prefs.getString("tuitionPhone", "") ?: "",
+            address = prefs.getString("tuitionAddress", "") ?: ""
         )
     }
 
