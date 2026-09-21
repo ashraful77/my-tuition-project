@@ -257,13 +257,13 @@ fun createReceiptPdf(
     labelValue("Payment date", sorted.firstOrNull()?.date ?: currentDate(), 302f, 146f)
 
     text("STUDENT INFORMATION", left, 208f, 10f, true, navy)
-    fill(left, 218f, right, 276f, Color.WHITE)
-    line(left, 218f, right, 218f); line(left, 276f, right, 276f); line(left, 247f, right, 247f)
-    line(298f, 218f, 298f, 276f)
-    labelValue("Student name", student.name.take(42), left + 12f, 232f)
-    labelValue("Class / batch", "${student.className.ifBlank { "—" }}  •  ${student.batch.ifBlank { "—" }}", 310f, 232f)
-    labelValue("Joining month", student.joiningMonth.ifBlank { "Not provided" }, left + 12f, 261f)
-    labelValue("Monthly fee", "₹${student.monthlyFee}", 310f, 261f)
+    fill(left, 218f, right, 291f, Color.WHITE)
+    line(left, 218f, right, 218f); line(left, 291f, right, 291f); line(left, 254f, right, 254f)
+    line(298f, 218f, 298f, 291f)
+    labelValue("Student name", student.name.take(42), left + 12f, 233f)
+    labelValue("Class / batch", "${student.className.ifBlank { "—" }}  •  ${student.batch.ifBlank { "—" }}", 310f, 233f)
+    labelValue("Joining month", student.joiningMonth.ifBlank { "Not provided" }, left + 12f, 270f)
+    labelValue("Monthly fee", "₹${student.monthlyFee}", 310f, 270f)
 
     text("PAYMENT DETAILS", left, 318f, 10f, true, navy)
     fill(left, 328f, right, 354f, navy)
@@ -273,8 +273,8 @@ fun createReceiptPdf(
     val visibleRows = sorted.take(5)
     visibleRows.forEachIndexed { index, payment ->
         val top = 354f + index * 29f
-        if (index % 2 == 0) fill(left, top, right, top + 27f, Color.rgb(249, 250, 252))
-        line(left, top + 27f, right, top + 27f)
+        if (index % 2 == 0) fill(left, top, right, top + 29f, Color.rgb(249, 250, 252))
+        line(left, top + 29f, right, top + 29f)
         text(payment.month.take(32), left + 12f, top + 19f, 9.5f, index == 0)
         text(payment.date, 335f, top + 19f, 9f)
         text("₹${payment.amount}", 474f, top + 19f, 10f, true, navy)
