@@ -336,37 +336,32 @@ fun shareReceiptWhatsApp(context: Context, uri: Uri) {
 
 fun paymentReceiptText(profile: TuitionProfile, student: Student, payments: List<Payment>, receiptNo: String): String {
     val sortedPayments = payments.sortedBy { monthKey(it.month) }
-    val months = sortedPayments.joinToString(", ") { it.month }
+    val months = sortedPayments.map { it.month }.distinct()
     val total = sortedPayments.sumOf { it.amount }
-    val date = sortedPayments.firstOrNull()?.date ?: currentDate()
 
     return buildString {
-        appendLine(profile.tuitionName)
-        appendLine("Payment Receipt")
-        appendLine("Student: ${student.name}")
-        appendLine("Months: $months")
-        appendLine("Amount Paid: ₹$total")
-        appendLine("Receipt No: $receiptNo")
-        appendLine("Date: $date")
-        append("Thank you for your payment.")
+        appendLine("Tuition fees for the month:")
+        if (months.size == 1) {
+            appendLine(months.first())
+            appendLine()
+            appendLine("Dear ${student.name}, your payment for the")
+            appendLine("month ${months.first()} has been made")
+        } else {
+            appendLine(months.joinToString(", "))
+            appendLine()
+            appendLine("Dear ${student.name}, your payment for the")
+            appendLine("months ${months.joinToString(", ")} has been made")
+        }
+        appendLine("successfully!")
+        appendLine("Paid amount: ₹$total")
+        appendLine("Thank you.")
+        appendLine()
+        append("regards- ${profile.teacherName.uppercase()}")
     }
 }
 
 fun shareReceiptText(context: Context, student: Student, payments: List<Payment>, receiptNo: String, profile: TuitionProfile, mode: String) {
-    val sortedPayments = payments.sortedBy { monthKey(it.month) }
-    val months = sortedPayments.joinToString(", ") { it.month }
-    val total = sortedPayments.sumOf { it.amount }
-    val date = sortedPayments.firstOrNull()?.date ?: currentDate()
-    val body = buildString {
-        appendLine(profile.tuitionName)
-        appendLine("Payment Receipt")
-        appendLine("Student: ${student.name}")
-        appendLine("Months: $months")
-        appendLine("Amount Paid: ₹$total")
-        appendLine("Receipt No: $receiptNo")
-        appendLine("Date: $date")
-        append("Thank you for your payment.")
-    }
+    val body = paymentReceiptText(profile, student, payments, receiptNo)
 
     try {
         val intent = if (mode == "SMS" && student.phone.isNotBlank()) {
