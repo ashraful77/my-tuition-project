@@ -2613,89 +2613,138 @@ fun ReceiptHistoryDialog(
     var selectedReceipt by remember { mutableStateOf<List<Payment>?>(null) }
     var selectedStudent by remember { mutableStateOf<Student?>(null) }
     var receiptSearch by remember { mutableStateOf("") }
+    var selectedMonth by remember { mutableStateOf("All Months") }
+    var selectedStudentId by remember { mutableStateOf(0L) }
+    var dateFilterEnabled by remember { mutableStateOf(false) }
+    var fromDate by remember { mutableStateOf("") }
+    var toDate by remember { mutableStateOf("") }
+    var monthMenu by remember { mutableStateOf(false) }
+    var studentMenu by remember { mutableStateOf(false) }
 
-    val receiptGroups = payments
-        .filter { it.receiptNo.isNotBlank() }
-        .groupBy { it.receiptNo }
-        .values
-        .filter { group ->
-            val first = group.first()
-            val studentName = studentMap[first.studentId]?.name.orEmpty()
-            receiptSearch.isBlank() || first.receiptNo.contains(receiptSearch, true) || studentName.contains(receiptSearch, true)
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault()) }
+    val displayMonthFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH) }
+    fun parsePaymentDate(value: String): LocalDate? = try {
+        LocalDate.parse(value.trim(), dateFormatter)
+    } catch (_: Exception) { null }
+
+    val availableMonths = payments.mapNotNull { parsePaymentDate(it.date) }
+        .map { it.withDayOfMonth(1) }.distinct().sortedDescending()
+        .map { it.format(displayMonthFormatter) }
+    val sortedStudents = students.sortedBy { it.name.lowercase(Locale.getDefault()) }
+    val parsedFrom = if (dateFilterEnabled) parsePaymentDate(fromDate) else null
+    val parsedTo = if (dateFilterEnabled) parsePaymentDate(toDate) else null
+    val dateError = if (dateFilterEnabled) when {
+        fromDate.isNotBlank() && parsedFrom == null -> "Invalid From date. Use DD/MM/YYYY."
+        toDate.isNotBlank() && parsedTo == null -> "Invalid To date. Use DD/MM/YYYY."
+        parsedFrom != null && parsedTo != null && parsedFrom.isAfter(parsedTo) -> "From date cannot be after To date."
+        else -> ""
+    } else ""
+    val filterActiveCount =
+        (if (selectedMonth != "All Months") 1 else 0) +
+        (if (selectedStudentId != 0L) 1 else 0) +
+        (if (dateFilterEnabled && (fromDate.isNotBlank() || toDate.isNotBlank())) 1 else 0)
+
+    val receiptGroups = payments.filter { it.receiptNo.isNotBlank() }.groupBy { it.receiptNo }.values
+        .mapNotNull { group ->
+            val validDates = group.mapNotNull { parsePaymentDate(it.date) }
+            val latestDate = validDates.maxOrNull()
+            val studentId = group.firstOrNull()?.studentId ?: 0L
+            val studentName = studentMap[studentId]?.name.orEmpty()
+            val matchesSearch = receiptSearch.isBlank() ||
+                group.any { it.receiptNo.contains(receiptSearch, true) } || studentName.contains(receiptSearch, true)
+            val matchesMonth = selectedMonth == "All Months" || latestDate?.format(displayMonthFormatter) == selectedMonth
+            val matchesStudent = selectedStudentId == 0L || group.any { it.studentId == selectedStudentId }
+            val matchesFrom = parsedFrom == null || validDates.any { !it.isBefore(parsedFrom) }
+            val matchesTo = parsedTo == null || validDates.any { !it.isAfter(parsedTo) }
+            if (dateError.isNotBlank() || !matchesSearch || !matchesMonth || !matchesStudent || !matchesFrom || !matchesTo) null
+            else group to latestDate
         }
-        .sortedByDescending { group ->
-            try {
-                LocalDate.parse(
-                    group.firstOrNull()?.date.orEmpty(),
-                    DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.getDefault())
-                ).toEpochDay()
-            } catch (_: Exception) {
-                Long.MIN_VALUE
-            }
-        }
+        .sortedWith(compareByDescending<Pair<List<Payment>, LocalDate?>> { it.second ?: LocalDate.MIN }
+            .thenByDescending { it.first.firstOrNull()?.receiptNo.orEmpty() })
+
+    val filteredPayments = receiptGroups.flatMap { it.first }
+    val totalCollected = filteredPayments.sumOf { it.amount }
 
     FullScreenPage(
         onDismissRequest = onDismiss,
         title = { Text("Receipt History", fontWeight = FontWeight.Bold) },
         text = {
-            Column(
-                Modifier.fillMaxWidth().heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    "Open or share any previous receipt.",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                OutlinedTextField(
-                    value = receiptSearch,
-                    onValueChange = { receiptSearch = it },
-                    label = { Text("Search receipt no. or student name") },
-                    singleLine = true,
+            Column(Modifier.fillMaxWidth().heightIn(max = 620.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Receipts are arranged newest first. Use filters to find a specific payment.",
+                    style = MaterialTheme.typography.bodySmall)
+                OutlinedTextField(value = receiptSearch, onValueChange = { receiptSearch = it },
+                    label = { Text("Search receipt no. or student name") }, singleLine = true,
                     trailingIcon = { if (receiptSearch.isNotBlank()) TextButton(onClick = { receiptSearch = "" }) { Text("Clear") } },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                    modifier = Modifier.fillMaxWidth())
+
+                Card {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text("Filters", fontWeight = FontWeight.Bold)
+                            if (filterActiveCount > 0) Text("$filterActiveCount filter${if (filterActiveCount == 1) "" else "s"} active", style = MaterialTheme.typography.labelSmall)
+                        }
+                        Box {
+                            OutlinedButton(onClick = { monthMenu = true }, modifier = Modifier.fillMaxWidth()) { Text("Month: $selectedMonth") }
+                            DropdownMenu(expanded = monthMenu, onDismissRequest = { monthMenu = false }) {
+                                DropdownMenuItem(text = { Text("All Months") }, onClick = { selectedMonth = "All Months"; monthMenu = false })
+                                availableMonths.forEach { month -> DropdownMenuItem(text = { Text(month) }, onClick = { selectedMonth = month; monthMenu = false }) }
+                            }
+                        }
+                        Box {
+                            OutlinedButton(onClick = { studentMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                                val label = if (selectedStudentId == 0L) "All Students" else "Student: ${studentMap[selectedStudentId]?.name ?: "Unknown"}"
+                                Text(label)
+                            }
+                            DropdownMenu(expanded = studentMenu, onDismissRequest = { studentMenu = false }) {
+                                DropdownMenuItem(text = { Text("All Students") }, onClick = { selectedStudentId = 0L; studentMenu = false })
+                                sortedStudents.forEach { student ->
+                                    DropdownMenuItem(text = { Text("${student.name} • Class ${student.className}") }, onClick = { selectedStudentId = student.id; studentMenu = false })
+                                }
+                            }
+                        }
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = dateFilterEnabled, onCheckedChange = { dateFilterEnabled = it; if (!it) { fromDate = ""; toDate = "" } })
+                            Text("Custom Date Range")
+                        }
+                        if (dateFilterEnabled) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(value = fromDate, onValueChange = { fromDate = it }, label = { Text("From") }, placeholder = { Text("DD/MM/YYYY") }, singleLine = true, modifier = Modifier.weight(1f))
+                            OutlinedTextField(value = toDate, onValueChange = { toDate = it }, label = { Text("To") }, placeholder = { Text("DD/MM/YYYY") }, singleLine = true, modifier = Modifier.weight(1f))
+                        }
+                        if (dateError.isNotBlank()) Text(dateError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        if (filterActiveCount > 0 || receiptSearch.isNotBlank()) TextButton(onClick = {
+                            selectedMonth = "All Months"; selectedStudentId = 0L; dateFilterEnabled = false; fromDate = ""; toDate = ""; receiptSearch = ""
+                        }) { Text("Clear All Filters") }
+                    }
+                }
+
+                Card {
+                    Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Column { Text("Receipts", style = MaterialTheme.typography.labelSmall); Text(receiptGroups.size.toString(), fontWeight = FontWeight.Bold) }
+                        Column { Text("Payments", style = MaterialTheme.typography.labelSmall); Text(filteredPayments.size.toString(), fontWeight = FontWeight.Bold) }
+                        Column { Text("Collected", style = MaterialTheme.typography.labelSmall); Text("₹$totalCollected", fontWeight = FontWeight.Bold) }
+                    }
+                }
 
                 if (receiptGroups.isEmpty()) {
-                    Text("No receipt history yet.")
+                    Text(if (payments.any { it.receiptNo.isNotBlank() }) "No receipts match the selected filters." else "No receipt history yet.")
                 } else {
-                    receiptGroups.forEach { group ->
+                    receiptGroups.forEach { (group, latestDate) ->
                         val first = group.first()
                         val student = studentMap[first.studentId]
                         val total = group.sumOf { it.amount }
-                        val months = group.sortedBy { monthKey(it.month) }
-                            .joinToString(", ") { it.month }
-
+                        val months = group.sortedBy { monthKey(it.month) }.joinToString(", ") { it.month }
                         Card {
-                            Column(
-                                Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 Text(first.receiptNo, fontWeight = FontWeight.Bold)
                                 Text(student?.name ?: "Unknown student")
-                                Text("Date: ${first.date}")
+                                Text("Date: ${latestDate?.format(dateFormatter) ?: first.date}")
                                 Text("Months: $months")
                                 Text("Amount: ₹$total", fontWeight = FontWeight.Bold)
-
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(
-                                        enabled = student != null,
-                                        onClick = {
-                                            selectedStudent = student
-                                            selectedReceipt = group
-                                        }
-                                    ) { Text("Share Receipt") }
-
-                                    TextButton(onClick = {
-                                        // Edit the individual month/payment while keeping receipt history intact.
-                                        onEditPayment(group.first())
-                                    }) { Text("Edit") }
-
-                                    TextButton(onClick = {
-                                        onDeletePayment(group.first())
-                                    }) { Text("Delete") }
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                    TextButton(enabled = student != null, onClick = { selectedStudent = student; selectedReceipt = group }) { Text("Share Receipt") }
+                                    TextButton(onClick = { onEditPayment(group.first()) }) { Text("Edit") }
+                                    TextButton(onClick = { onDeletePayment(group.first()) }) { Text("Delete") }
                                 }
                             }
                         }
@@ -2703,44 +2752,28 @@ fun ReceiptHistoryDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Close") }
-        }
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
 
     val receiptPayments = selectedReceipt
     val receiptStudent = selectedStudent
-
     if (receiptPayments != null && receiptStudent != null) {
         val receiptNo = receiptPayments.first().receiptNo
-        val uri = remember(receiptNo, profile) {
-            createReceiptPdf(context, receiptStudent, receiptPayments, receiptNo, profile)
-        }
-
+        val uri = remember(receiptNo, profile) { createReceiptPdf(context, receiptStudent, receiptPayments, receiptNo, profile) }
         AlertDialog(
-            onDismissRequest = {
-                selectedReceipt = null
-                selectedStudent = null
-            },
+            onDismissRequest = { selectedReceipt = null; selectedStudent = null },
             title = { Text("Share Receipt") },
-            text = {
-                Text(
-                    "Receipt $receiptNo is ready. Choose how you want to send it."
-                )
-            },
+            text = { Text("Receipt $receiptNo is ready. Choose how you want to send it.") },
             confirmButton = {
-                Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                    Button(onClick = { shareReceiptText(context, receiptStudent, receiptPayments, receiptNo, profile, "WhatsApp"); selectedReceipt=null; selectedStudent=null }) { Text("WhatsApp") }
-                    TextButton(onClick = { shareReceiptText(context, receiptStudent, receiptPayments, receiptNo, profile, "SMS"); selectedReceipt=null; selectedStudent=null }) { Text("SMS") }
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Button(onClick = { shareReceiptText(context, receiptStudent, receiptPayments, receiptNo, profile, "WhatsApp"); selectedReceipt = null; selectedStudent = null }) { Text("WhatsApp") }
+                    TextButton(onClick = { shareReceiptText(context, receiptStudent, receiptPayments, receiptNo, profile, "SMS"); selectedReceipt = null; selectedStudent = null }) { Text("SMS") }
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { shareReceipt(context, uri); selectedReceipt=null; selectedStudent=null }) { Text("PDF / Other") }
-            }
+            dismissButton = { TextButton(onClick = { shareReceipt(context, uri); selectedReceipt = null; selectedStudent = null }) { Text("PDF / Other") } }
         )
     }
 }
-
 fun createReportPdf(
     context: Context,
     students: List<Student>,
